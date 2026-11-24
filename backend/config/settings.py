@@ -148,3 +148,34 @@ STATIC_URL = 'static/'
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
+
+
+# Session Django : le cookie est HttpOnly, le front l'envoie via le proxy Vite.
+# Seul un compte créé dans l'admin (ou par createsuperuser) peut lire l'API.
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': [
+        'chez_nous.session.AuthentificationSession',
+    ],
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.IsAuthenticated',
+    ],
+    'EXCEPTION_HANDLER': 'chez_nous.exceptions.gestionnaire',
+}
+
+# Le proxy Vite réécrit l'hôte vers Django. L'origine du navigateur
+# (localhost:5173, ou le téléphone sur le réseau) doit être acceptée.
+_origines_locales = ['http://localhost:5173', 'http://127.0.0.1:5173']
+CSRF_TRUSTED_ORIGINS = [
+    origine.strip()
+    for origine in env.list('CSRF_TRUSTED_ORIGINS', default=_origines_locales)
+    if origine.strip()
+]
+CSRF_FAILURE_VIEW = 'config.csrf.echec_csrf'
+# Le front lit ce cookie pour le renvoyer dans l'en-tête X-CSRFToken.
+CSRF_COOKIE_HTTPONLY = False
+CSRF_COOKIE_SAMESITE = 'Lax'
+SESSION_COOKIE_HTTPONLY = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+# Avec DEBUG à False, les cookies ne partent qu'en HTTPS.
+SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=not DEBUG)
+CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=not DEBUG)

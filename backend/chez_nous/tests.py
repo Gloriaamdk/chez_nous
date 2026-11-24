@@ -1,11 +1,22 @@
 from datetime import date
 
+from django.contrib.auth.models import User
 from rest_framework.test import APITestCase
 
 from chez_nous.models import Logement
 
 
-class LogementAPITests(APITestCase):
+class APIAuthentifiee(APITestCase):
+    def setUp(self):
+        super().setUp()
+        self.proprietaire = User.objects.create_user(
+            username="proprietaire",
+            password="mot-de-passe-solide",
+        )
+        self.client.force_login(self.proprietaire)
+
+
+class LogementAPITests(APIAuthentifiee):
     def test_deux_studios_dans_des_pays_differents_restent_distincts(self):
         france = self.client.post(
             "/api/logements/",
@@ -84,8 +95,9 @@ class LogementAPITests(APITestCase):
         self.assertGreater(len(pays), 100)
 
 
-class SejourAPITests(APITestCase):
+class SejourAPITests(APIAuthentifiee):
     def setUp(self):
+        super().setUp()
         self.logement = Logement.objects.create(
             nom="Studio",
             type=Logement.Type.STUDIO,
@@ -217,8 +229,9 @@ class SejourAPITests(APITestCase):
         self.assertEqual(date.fromisoformat(paiement.data["date"]), date(2026, 12, 2))
 
 
-class RapportAPITests(APITestCase):
+class RapportAPITests(APIAuthentifiee):
     def setUp(self):
+        super().setUp()
         self.logement = Logement.objects.create(
             nom="Studio",
             type=Logement.Type.STUDIO,

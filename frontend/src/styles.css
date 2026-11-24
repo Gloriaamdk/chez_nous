@@ -35,6 +35,34 @@ button {
   font-weight: 700;
 }
 
+.app-connexion {
+  padding-bottom: 1.5rem;
+}
+
+.entete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem 0;
+}
+
+.entete .brand {
+  padding: 0;
+}
+
+.entete .bouton {
+  flex: 0 0 auto;
+  min-height: 2.5rem;
+  padding: 0.4rem 0.7rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.session-expiree {
+  margin-top: 0.75rem;
+}
+
 .page {
   padding: 0.85rem 1rem 1.5rem;
 }
