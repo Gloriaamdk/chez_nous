@@ -80,10 +80,12 @@ def _indicateurs(logements, reservations, paiements, depenses, debut, fin):
     nuits_periode = (fin - debut).days
     lignes = []
     for logement in logements:
+        # Le séjour annulé libère les nuits. L'encaissement, lui, reste :
+        # c'est de l'argent réellement reçu pendant la période.
         nuits = sum(
             nuits_communes(reservation.date_arrivee, reservation.date_depart, debut, fin)
             for reservation in reservations
-            if reservation.logement_id == logement.id
+            if reservation.logement_id == logement.id and not reservation.annulee
         )
         encaisse = sum(
             paiement.montant

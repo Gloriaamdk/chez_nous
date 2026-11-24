@@ -119,6 +119,20 @@ export function createReservation(reservation) {
   })
 }
 
+export function updateReservation(id, reservation) {
+  return requestJson(`/api/reservations/${id}/`, {
+    method: 'PATCH',
+    body: JSON.stringify(reservation),
+  })
+}
+
+export function annulerReservation(id) {
+  return requestJson(`/api/reservations/${id}/annuler/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
 export function getDisponibilites(arrivee, depart) {
   const params = new URLSearchParams({ arrivee, depart })
   return requestJson(`/api/disponibilites/?${params}`)
@@ -126,6 +140,10 @@ export function getDisponibilites(arrivee, depart) {
 
 export function getSynthese() {
   return requestJson('/api/synthese/')
+}
+
+export function getTableauDeBord() {
+  return requestJson('/api/tableau-de-bord/')
 }
 
 export function getPaiements() {

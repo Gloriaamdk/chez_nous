@@ -11,6 +11,7 @@ LECTURES = [
     "/api/referentiels/",
     "/api/disponibilites/?arrivee=2026-12-01&depart=2026-12-05",
     "/api/synthese/",
+    "/api/tableau-de-bord/",
     "/api/rapports/",
     "/api/auth/moi/",
 ]
@@ -51,6 +52,10 @@ class AuthentificationAPITests(APITestCase):
 
         logement = self.client.patch("/api/logements/1/", {}, format="json")
         self.assertEqual(logement.status_code, 401)
+        reservation = self.client.patch("/api/reservations/1/", {}, format="json")
+        self.assertEqual(reservation.status_code, 401)
+        annulation = self.client.post("/api/reservations/1/annuler/", {}, format="json")
+        self.assertEqual(annulation.status_code, 401)
 
     def test_une_session_autorise_la_lecture(self):
         self.client.login(username="proprietaire", password=MOT_DE_PASSE)

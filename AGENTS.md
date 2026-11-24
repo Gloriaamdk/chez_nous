@@ -98,4 +98,12 @@ Mettre à jour la section Avancement après chaque vérification.
   - Le compte se crée avec `python manage.py createsuperuser`. Les autres comptes se créent dans l’admin Django.
   - `manage.py check` : aucun problème. `manage.py test` : 19 tests, OK. `npm run build` : compilation réussie.
   - Parcours navigateur : mot de passe refusé, connexion, pages, déconnexion, session expirée.
+- Terminé : statut du jour, modification et annulation des réservations, anti-chevauchement, vérifiés.
+  - Le tableau de bord n’affiche plus le JSON de `/api/status/`. Django calcule le résumé du jour et le statut de chaque logement : libre, occupé (client et date de départ), arrivée, départ, ou les deux le même jour.
+  - Une réservation se modifie (dates, client, montant). Les échéances sont recréées seulement si le calendrier ou le montant change. Les paiements restent : ils sont liés à la réservation, pas aux échéances.
+  - Une réservation annulée reste dans l’historique, libère les dates et sort du prévu. L’argent déjà encaissé n’est pas effacé : il est isolé dans « Encaissé sur un séjour annulé », pour un remboursement éventuel. Il ne réduit pas le reste à recevoir des autres séjours.
+  - Chaque nuit occupée est unique par logement (le jour du départ n’est pas occupé). SQLite prend le verrou d’écriture au début de la transaction ; PostgreSQL utilisera le verrou de ligne. La même contrainte d’unicité sert aux deux.
+  - Sur Windows, dans `backend`, environnement virtuel activé : `python manage.py migrate`, puis `python manage.py test`.
+  - `manage.py check` : aucun problème. `manage.py test` : 30 tests, OK. `npm run build` : compilation réussie.
+  - Parcours navigateur : statuts du jour, modification sans perdre l’acompte, annulation, dates libérées, encaissement conservé.
 - Prochaine étape : prévoir la synchronisation Airbnb, sans partenaire choisi pour l’instant.
