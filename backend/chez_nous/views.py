@@ -1,11 +1,13 @@
 from datetime import datetime
 
+from django.utils import timezone
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
 from .models import Depense, Logement, Paiement, Reservation
 from .pays import PAYS_PAR_CODE, pays_francais
+from .rapports import construire_rapport
 from .serializers import (
     DepenseSerializer,
     LogementSerializer,
@@ -92,6 +94,24 @@ def disponibilites(request):
 @api_view(["GET"])
 def synthese(request):
     return Response(synthese_financiere())
+
+
+@api_view(["GET"])
+def rapport(request):
+    periode = request.query_params.get("periode", "mois")
+    if periode not in {"semaine", "mois"}:
+        return Response(
+            {"detail": "Choisissez une période : semaine ou mois."},
+            status=400,
+        )
+    jour = _date(request.query_params.get("date")) or timezone.localdate()
+    logements = list(Logement.objects.all())
+    reservations = list(Reservation.objects.all())
+    paiements = list(Paiement.objects.select_related("reservation"))
+    depenses = list(Depense.objects.all())
+    return Response(
+        construire_rapport(logements, reservations, paiements, depenses, periode, jour)
+    )
 
 
 class LogementViewSet(ModelViewSet):

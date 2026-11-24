@@ -85,6 +85,14 @@ export function createDepense(depense) {
   })
 }
 
+export function getRapport(periode, date) {
+  const params = new URLSearchParams({ periode })
+  if (date) {
+    params.set('date', date)
+  }
+  return requestJson(`/api/rapports/?${params}`)
+}
+
 export function formatFcfa(montant) {
   return `${new Intl.NumberFormat('fr-FR').format(montant)} FCFA`
 }

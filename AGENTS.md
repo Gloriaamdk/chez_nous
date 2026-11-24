@@ -77,4 +77,8 @@ Mettre à jour la section Avancement après chaque vérification.
   - L’acompte est un encaissement. Le prévu, l’encaissé et le reste sont calculés par Django, en FCFA.
   - Une location au mois crée une échéance par mois. Une dépense est rattachée à un logement.
   - Essai dans le navigateur, puis effacé : la base de travail ne contient pas cet exemple.
-- Prochaine étape : les rapports hebdomadaires et mensuels.
+- Terminé : rapports hebdomadaires et mensuels, vérifiés.
+  - Bilan d’occupation, d’encaissements et de dépenses, par logement et au total.
+  - Chaque bilan est comparé à la semaine ou au mois précédent.
+  - Les exemples chiffrés restent dans la base de test.
+- Prochaine étape : prévoir la synchronisation Airbnb, sans partenaire choisi pour l’instant.

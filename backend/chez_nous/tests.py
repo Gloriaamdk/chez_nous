@@ -215,3 +215,82 @@ class SejourAPITests(APITestCase):
         self.assertEqual(synthese.data["depenses"], 8000)
         self.assertEqual(synthese.data["montant_encaisse"], 15000)
         self.assertEqual(date.fromisoformat(paiement.data["date"]), date(2026, 12, 2))
+
+
+class RapportAPITests(APITestCase):
+    def setUp(self):
+        self.logement = Logement.objects.create(
+            nom="Studio",
+            type=Logement.Type.STUDIO,
+            pays="FR",
+            ville="Lyon",
+        )
+        self.autre = Logement.objects.create(
+            nom="Chambre-salon",
+            type=Logement.Type.CHAMBRE_SALON,
+            pays="CM",
+            ville="Douala",
+        )
+
+    def test_bilan_mensuel_compare_la_periode_precedente(self):
+        from chez_nous.models import Depense, Paiement, Reservation
+
+        studio = Reservation.objects.create(
+            logement=self.logement,
+            client_nom="Awa",
+            client_telephone="0600000000",
+            canal="whatsapp",
+            mode="nuitee",
+            date_arrivee=date(2026, 12, 10),
+            date_depart=date(2026, 12, 14),
+            montant_prevu=40000,
+        )
+        studio.generer_echeances()
+        Paiement.objects.create(
+            reservation=studio,
+            montant=10000,
+            date=date(2026, 12, 11),
+            nature="acompte",
+        )
+        Paiement.objects.create(
+            reservation=studio,
+            montant=5000,
+            date=date(2026, 11, 20),
+            nature="acompte",
+        )
+        Depense.objects.create(
+            logement=self.logement,
+            libelle="Eau",
+            montant=8000,
+            date=date(2026, 12, 12),
+        )
+        Depense.objects.create(
+            logement=self.autre,
+            libelle="Peinture",
+            montant=2000,
+            date=date(2026, 11, 2),
+        )
+
+        reponse = self.client.get("/api/rapports/", {"periode": "mois", "date": "2026-12-18"})
+        self.assertEqual(reponse.status_code, 200)
+        self.assertEqual(reponse.data["libelle"], "décembre 2026")
+        self.assertEqual(reponse.data["precedente"]["libelle"], "novembre 2026")
+        self.assertEqual(reponse.data["total"]["nuits_occupees"], 4)
+        self.assertEqual(reponse.data["total"]["encaissements"], 10000)
+        self.assertEqual(reponse.data["total"]["depenses"], 8000)
+        self.assertEqual(reponse.data["total"]["precedent"]["encaissements"], 5000)
+        self.assertEqual(reponse.data["total"]["precedent"]["depenses"], 2000)
+        self.assertEqual(reponse.data["total"]["ecart"]["encaissements"], 5000)
+
+        par_nom = {ligne["nom"]: ligne for ligne in reponse.data["logements"]}
+        self.assertEqual(par_nom["Studio"]["nuits_occupees"], 4)
+        self.assertEqual(par_nom["Studio"]["encaissements"], 10000)
+        self.assertEqual(par_nom["Chambre-salon"]["nuits_occupees"], 0)
+        self.assertEqual(par_nom["Chambre-salon"]["precedent"]["depenses"], 2000)
+
+        semaine = self.client.get("/api/rapports/", {"periode": "semaine", "date": "2026-12-10"})
+        self.assertEqual(semaine.status_code, 200)
+        self.assertEqual(semaine.data["debut"], date(2026, 12, 7))
+        self.assertEqual(semaine.data["fin"], date(2026, 12, 14))
+        self.assertEqual(semaine.data["total"]["nuits_occupees"], 4)
+        self.assertEqual(semaine.data["total"]["encaissements"], 10000)
