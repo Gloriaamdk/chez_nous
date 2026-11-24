@@ -1,20 +1,85 @@
+let signalerSessionExpiree = () => {}
+
+export function definirGestionnaireSession(gestionnaire) {
+  signalerSessionExpiree = gestionnaire
+}
+
+function lireJetonCsrf() {
+  const correspondance = document.cookie.match(/(?:^|;\s*)csrftoken=([^;]*)/)
+  return correspondance ? decodeURIComponent(correspondance[1]) : ''
+}
+
 async function requestJson(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      Accept: 'application/json',
-      ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-      ...options.headers,
-    },
-  })
+  const { gererSession = true, headers: enTetes = {}, ...requete } = options
+  const headers = {
+    Accept: 'application/json',
+    ...(requete.body ? { 'Content-Type': 'application/json' } : {}),
+    ...enTetes,
+  }
+  const jeton = lireJetonCsrf()
+  if (jeton) {
+    headers['X-CSRFToken'] = jeton
+  }
+
+  let response
+  try {
+    response = await fetch(url, {
+      ...requete,
+      credentials: 'include',
+      headers,
+    })
+  } catch {
+    const error = new Error('Le serveur ne répond pas.')
+    error.status = 0
+    throw error
+  }
+
   const text = await response.text()
-  const data = text ? JSON.parse(text) : null
+  let data = null
+  if (text) {
+    try {
+      data = JSON.parse(text)
+    } catch {
+      data = null
+    }
+  }
+  const detail = data && typeof data.detail === 'string' ? data.detail : ''
+  const sessionAbsente =
+    response.status === 401 || (response.status === 403 && detail === 'Connexion requise.')
+  if (sessionAbsente && gererSession) {
+    signalerSessionExpiree()
+  }
   if (!response.ok) {
     const error = new Error(`Réponse ${response.status}`)
+    error.status = response.status
     error.details = data
     throw error
   }
   return data
+}
+
+export function preparerCsrf() {
+  return requestJson('/api/auth/csrf/', { gererSession: false })
+}
+
+export function getMoi() {
+  return requestJson('/api/auth/moi/', { gererSession: false })
+}
+
+export async function connecter(identifiant, motDePasse) {
+  await preparerCsrf()
+  return requestJson('/api/auth/connexion/', {
+    method: 'POST',
+    gererSession: false,
+    body: JSON.stringify({
+      identifiant,
+      mot_de_passe: motDePasse,
+    }),
+  })
+}
+
+export function deconnecter() {
+  return requestJson('/api/auth/deconnexion/', { method: 'POST' })
 }
 
 export function getStatus() {

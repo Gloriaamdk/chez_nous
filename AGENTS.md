@@ -89,4 +89,13 @@ Mettre à jour la section Avancement après chaque vérification.
   - Langue `fr-fr`, fuseau `Africa/Lome`, `USE_TZ` reste activé.
   - L’ancienne clé publiée est compromise : en générer une nouvelle dans `backend/.env`.
   - `manage.py check` et `manage.py test` passent. L’API locale répond toujours sur `/api/status/`.
-- Prochaine étape : authentification de l’API, sans modifier le frontend. La synchronisation Airbnb reste à prévoir, sans partenaire choisi pour l’instant.
+- Terminé : accès réservé à la propriétaire, vérifié.
+  - Session Django et jeton CSRF, via le proxy Vite. Le cookie de session est HttpOnly.
+  - `IsAuthenticated` par défaut. `GET /api/status/` reste public.
+  - `POST /api/auth/connexion/`, `POST /api/auth/deconnexion/`, `GET /api/auth/moi/`, `GET /api/auth/csrf/`.
+  - Écran de connexion en français, bouton « Se déconnecter », retour à cet écran si la session expire.
+  - `src/api.js` envoie le cookie (`credentials: 'include'`) et l’en-tête `X-CSRFToken`.
+  - Le compte se crée avec `python manage.py createsuperuser`. Les autres comptes se créent dans l’admin Django.
+  - `manage.py check` : aucun problème. `manage.py test` : 19 tests, OK. `npm run build` : compilation réussie.
+  - Parcours navigateur : mot de passe refusé, connexion, pages, déconnexion, session expirée.
+- Prochaine étape : prévoir la synchronisation Airbnb, sans partenaire choisi pour l’instant.
