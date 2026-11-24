@@ -1,0 +1,220 @@
+:root {
+  --paper: #f4efe6;
+  --ink: #1c2822;
+  --muted: #5e6d64;
+  --green: #1d6b48;
+  --line: #e3d8c8;
+  --card: #fffdf8;
+  color: var(--ink);
+  background: var(--paper);
+  font-family: "Segoe UI", sans-serif;
+  line-height: 1.45;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button {
+  font: inherit;
+}
+
+.app {
+  min-height: 100dvh;
+  padding-bottom: 8rem;
+}
+
+.brand {
+  margin: 0;
+  padding: 0.9rem 1rem 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+
+.page {
+  padding: 0.85rem 1rem 1.5rem;
+}
+
+h1 {
+  margin: 0 0 0.75rem;
+  font-size: 1.7rem;
+  line-height: 1.2;
+}
+
+.status,
+.formulaire,
+.carte,
+.vide {
+  margin: 0.75rem 0 0;
+  padding: 1rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+}
+
+h2,
+h3 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.barre-logements {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.bouton {
+  min-height: 2.75rem;
+  padding: 0.55rem 0.9rem;
+  border: 0;
+  border-radius: 0.7rem;
+  background: var(--green);
+  color: white;
+  font-weight: 700;
+}
+
+.bouton-secondaire {
+  background: transparent;
+  color: var(--green);
+  border: 1px solid var(--green);
+}
+
+.formulaire,
+.filtre {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.filtre {
+  margin-top: 1rem;
+}
+
+label {
+  display: grid;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 0.7rem;
+  background: white;
+  color: var(--ink);
+  font: inherit;
+  font-weight: 400;
+}
+
+.actions {
+  display: flex;
+  gap: 0.6rem;
+}
+
+.erreur {
+  margin: 0;
+  color: #8a2d2d;
+}
+
+.cartes {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.carte p {
+  margin: 0.35rem 0 0;
+}
+
+.carte .bouton {
+  margin-top: 0.8rem;
+}
+
+.intro {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+}
+
+.sous-titre {
+  margin-top: 1.25rem;
+}
+
+.montants {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  margin-top: 0.75rem;
+}
+
+.montant {
+  margin: 0;
+  padding: 0.8rem;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 0.8rem;
+  font-weight: 700;
+}
+
+.montant span {
+  display: block;
+  margin-bottom: 0.2rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.libre {
+  color: var(--green);
+  font-weight: 700;
+}
+
+.occupe {
+  color: #8a2d2d;
+  font-weight: 700;
+}
+
+.actions-haut {
+  margin-top: 1rem;
+}
+
+nav {
+  position: fixed;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 0.2rem;
+  padding: 0.35rem 0.35rem calc(0.4rem + env(safe-area-inset-bottom));
+  background: var(--card);
+  border-top: 1px solid var(--line);
+}
+
+nav button {
+  min-height: 3.4rem;
+  padding: 0.35rem 0.15rem;
+  border: 0;
+  border-radius: 0.65rem;
+  background: transparent;
+  color: var(--muted);
+  font-size: 0.68rem;
+  line-height: 1.15;
+}
+
+nav button[aria-current="page"] {
+  background: var(--green);
+  color: white;
+  font-weight: 700;
+}
