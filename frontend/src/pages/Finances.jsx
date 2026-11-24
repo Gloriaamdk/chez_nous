@@ -93,6 +93,12 @@ export default function Finances() {
           <p className="montant"><span>Encaissé</span>{formatFcfa(synthese.montant_encaisse)}</p>
           <p className="montant"><span>Reste à recevoir</span>{formatFcfa(synthese.reste_a_recevoir)}</p>
           <p className="montant"><span>Dépenses</span>{formatFcfa(synthese.depenses)}</p>
+          {synthese.montant_encaisse_annule > 0 ? (
+            <p className="montant">
+              <span>Encaissé sur un séjour annulé</span>
+              {formatFcfa(synthese.montant_encaisse_annule)}
+            </p>
+          ) : null}
         </div>
       ) : null}
       {erreur ? <p className="erreur">{erreur}</p> : null}
@@ -101,7 +107,7 @@ export default function Finances() {
           type="button"
           className="bouton"
           onClick={() => setPaiement({
-            reservation: reservations[0]?.id || '',
+            reservation: reservations.find((reservation) => !reservation.annulee)?.id || '',
             montant: '',
             date: aujourdHui(),
             nature: 'echeance',
@@ -129,7 +135,7 @@ export default function Finances() {
             Réservation
             <select value={paiement.reservation} onChange={(evenement) => setPaiement({ ...paiement, reservation: evenement.target.value })} required>
               <option value="">Choisir</option>
-              {reservations.map((reservation) => (
+              {reservations.filter((reservation) => !reservation.annulee).map((reservation) => (
                 <option key={reservation.id} value={reservation.id}>
                   {reservation.client_nom} — {reservation.logement_nom}
                 </option>
@@ -186,12 +192,21 @@ export default function Finances() {
       {reservations.length === 0 ? <p className="vide">Aucun encaissement à suivre.</p> : (
         <ul className="cartes">
           {reservations.map((reservation) => (
-            <li key={reservation.id} className="carte">
+            <li key={reservation.id} className={reservation.annulee ? 'carte carte-annulee' : 'carte'}>
               <h3>{reservation.client_nom}</h3>
               <p>{reservation.logement_nom}</p>
+              {reservation.annulee ? <p className="badge-annulee">Annulée</p> : null}
               <p>Prévu {formatFcfa(reservation.montant_total_prevu)}</p>
               <p>Encaissé {formatFcfa(reservation.montant_encaisse)}</p>
-              <p>Reste {formatFcfa(reservation.reste_a_recevoir)}</p>
+              {reservation.annulee ? (
+                reservation.montant_encaisse > 0 ? (
+                  <p>Cet encaissement ne compte plus dans le reste à recevoir.</p>
+                ) : (
+                  <p>Ce séjour ne compte plus dans le prévu.</p>
+                )
+              ) : (
+                <p>Reste {formatFcfa(reservation.reste_a_recevoir)}</p>
+              )}
             </li>
           ))}
         </ul>

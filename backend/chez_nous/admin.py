@@ -1,7 +1,15 @@
 from django import forms
 from django.contrib import admin
 
-from .models import Depense, Echeance, Logement, Paiement, Reservation
+from .models import (
+    MESSAGE_LOGEMENT_OCCUPE,
+    Depense,
+    Echeance,
+    Logement,
+    Paiement,
+    Reservation,
+    nuits_prises,
+)
 from .pays import pays_francais
 
 
@@ -23,8 +31,31 @@ class LogementAdmin(admin.ModelAdmin):
     list_display = ("nom", "type", "ville", "pays", "id")
 
 
+class ReservationAdminForm(forms.ModelForm):
+    class Meta:
+        model = Reservation
+        fields = "__all__"
+
+    def clean(self):
+        cleaned = super().clean()
+        if self.errors or cleaned.get("annulee"):
+            return cleaned
+        logement = cleaned.get("logement")
+        arrivee = cleaned.get("date_arrivee")
+        depart = cleaned.get("date_depart")
+        if logement and arrivee and depart and nuits_prises(
+            logement.pk,
+            arrivee,
+            depart,
+            exclure=self.instance.pk,
+        ):
+            raise forms.ValidationError(MESSAGE_LOGEMENT_OCCUPE)
+        return cleaned
+
+
 @admin.register(Reservation)
 class ReservationAdmin(admin.ModelAdmin):
+    form = ReservationAdminForm
     list_display = (
         "client_nom",
         "logement",
@@ -33,6 +64,7 @@ class ReservationAdmin(admin.ModelAdmin):
         "mode",
         "canal",
         "montant_prevu",
+        "annulee",
     )
 
 

@@ -1,12 +1,14 @@
 from datetime import datetime
 
+from django.db.models import Prefetch
 from django.utils import timezone
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from .models import Depense, Logement, Paiement, Reservation
+from .models import Depense, Logement, NuitOccupee, Paiement, Reservation
+from .occupations import construire_tableau
 from .pays import PAYS_PAR_CODE, pays_francais
 from .rapports import construire_rapport
 from .serializers import (
@@ -73,13 +75,15 @@ def disponibilites(request):
             status=400,
         )
 
+    prises = set(
+        NuitOccupee.objects.filter(date__gte=arrivee, date__lt=depart).values_list(
+            "logement_id",
+            flat=True,
+        )
+    )
     logements = []
     for logement in Logement.objects.all():
-        occupe = Reservation.objects.filter(
-            logement=logement,
-            date_arrivee__lt=depart,
-            date_depart__gt=arrivee,
-        ).exists()
+        occupe = logement.id in prises
         logements.append(
             {
                 "id": logement.id,
@@ -96,6 +100,14 @@ def disponibilites(request):
 @api_view(["GET"])
 def synthese(request):
     return Response(synthese_financiere())
+
+
+@api_view(["GET"])
+def tableau_de_bord(request):
+    jour = timezone.localdate()
+    logements = list(Logement.objects.all())
+    reservations = list(Reservation.objects.select_related("logement"))
+    return Response(construire_tableau(logements, reservations, jour, synthese_financiere()))
 
 
 @api_view(["GET"])
@@ -117,9 +129,14 @@ def rapport(request):
 
 
 class LogementViewSet(ModelViewSet):
-    queryset = Logement.objects.all()
     serializer_class = LogementSerializer
     http_method_names = ["get", "post", "patch", "head", "options"]
+
+    def get_queryset(self):
+        actives = Reservation.objects.filter(annulee=False)
+        return Logement.objects.prefetch_related(
+            Prefetch("reservations", queryset=actives, to_attr="reservations_actives")
+        )
 
 
 class ReservationViewSet(ModelViewSet):
@@ -129,6 +146,15 @@ class ReservationViewSet(ModelViewSet):
     )
     serializer_class = ReservationSerializer
     http_method_names = ["get", "post", "patch", "head", "options"]
+
+    @action(detail=True, methods=["post"])
+    def annuler(self, request, pk=None):
+        reservation = self.get_object()
+        if not reservation.annulee:
+            reservation.annulee = True
+            reservation.annulee_le = timezone.localdate()
+            reservation.save(update_fields=["annulee", "annulee_le"])
+        return Response(self.get_serializer(reservation).data)
 
 
 class PaiementViewSet(ModelViewSet):

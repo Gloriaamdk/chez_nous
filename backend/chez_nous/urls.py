@@ -18,6 +18,7 @@ urlpatterns = [
     path("referentiels/", views.referentiels, name="referentiels"),
     path("disponibilites/", views.disponibilites, name="disponibilites"),
     path("synthese/", views.synthese, name="synthese"),
+    path("tableau-de-bord/", views.tableau_de_bord, name="tableau-de-bord"),
     path("rapports/", views.rapport, name="rapport"),
     path("", include(router.urls)),
 ]

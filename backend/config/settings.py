@@ -99,10 +99,25 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/5.2/ref/settings/#databases
 
+# SQLite, utilisé aujourd'hui. BEGIN IMMEDIATE prend le verrou d'écriture
+# dès le début de la transaction : deux réservations simultanées ne peuvent
+# plus lire « libre » puis écrire toutes les deux. Le délai laisse à l'autre
+# écriture le temps de finir. Le jour du passage à PostgreSQL, retirer
+# OPTIONS : le verrou de ligne et la contrainte d'unicité (logement, nuit)
+# prennent le relais, et ces options sont propres à SQLite.
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': os.environ.get('CHEZ_NOUS_SQLITE', BASE_DIR / 'db.sqlite3'),
+        'OPTIONS': {
+            'transaction_mode': 'IMMEDIATE',
+            'timeout': 20,
+        },
+        # Fichier plutôt que :memory: partagée : le verrou SQLite des tests
+        # est alors le même que sur le PC. Le motif .tmp-*.sqlite3 est ignoré.
+        'TEST': {
+            'NAME': str(BASE_DIR / '.tmp-test.sqlite3'),
+        },
     }
 }
 

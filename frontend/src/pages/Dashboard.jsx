@@ -4,9 +4,7 @@ import {
   formatFcfa,
   getLogements,
   getReferentiels,
-  getReservations,
-  getStatus,
-  getSynthese,
+  getTableauDeBord,
   updateLogement,
 } from '../api.js'
 
@@ -28,8 +26,27 @@ function messageErreur(error) {
   return textes[0] || 'Enregistrement impossible.'
 }
 
+function classeStatut(etat) {
+  if (etat === 'libre') {
+    return 'libre'
+  }
+  if (etat === 'occupe') {
+    return 'occupe'
+  }
+  return 'mouvement'
+}
+
+function LigneSejour({ sejour }) {
+  return (
+    <li className="carte">
+      <h3>{sejour.client_nom}</h3>
+      <p>{sejour.logement_nom}</p>
+      <p>{sejour.date_arrivee} → {sejour.date_depart}</p>
+    </li>
+  )
+}
+
 export default function Dashboard() {
-  const [connexion, setConnexion] = useState('Connexion au serveur…')
   const [logements, setLogements] = useState([])
   const [types, setTypes] = useState([])
   const [pays, setPays] = useState([])
@@ -37,27 +54,16 @@ export default function Dashboard() {
   const [formulaire, setFormulaire] = useState(null)
   const [erreur, setErreur] = useState('')
   const [enregistrement, setEnregistrement] = useState(false)
-  const [reservations, setReservations] = useState([])
-  const [synthese, setSynthese] = useState(null)
+  const [tableau, setTableau] = useState(null)
 
-  async function chargerLogements() {
-    setLogements(await getLogements())
+  async function charger() {
+    const [biens, resume] = await Promise.all([getLogements(), getTableauDeBord()])
+    setLogements(biens)
+    setTableau(resume)
   }
 
   useEffect(() => {
     let cancelled = false
-
-    getStatus()
-      .then((data) => {
-        if (!cancelled) {
-          setConnexion(`Connexion établie : ${JSON.stringify(data)}`)
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setConnexion('Connexion impossible.')
-        }
-      })
 
     getReferentiels()
       .then((data) => {
@@ -72,25 +78,11 @@ export default function Dashboard() {
         }
       })
 
-    chargerLogements().catch(() => {
+    charger().catch(() => {
       if (!cancelled) {
-        setErreur('Les logements sont indisponibles.')
+        setErreur('Le tableau de bord est indisponible.')
       }
     })
-    getReservations()
-      .then((data) => {
-        if (!cancelled) {
-          setReservations(data)
-        }
-      })
-      .catch(() => {})
-    getSynthese()
-      .then((data) => {
-        if (!cancelled) {
-          setSynthese(data)
-        }
-      })
-      .catch(() => {})
 
     return () => {
       cancelled = true
@@ -143,7 +135,7 @@ export default function Dashboard() {
       } else {
         await createLogement(payload)
       }
-      await chargerLogements()
+      await charger()
       setFormulaire(null)
     } catch (error) {
       setErreur(messageErreur(error))
@@ -158,15 +150,26 @@ export default function Dashboard() {
   const logementsFiltres = filtrePays
     ? logements.filter((logement) => logement.pays === filtrePays)
     : logements
-  const aujourdHui = new Date().toISOString().slice(0, 10)
-  const prochains = reservations
-    .filter((reservation) => reservation.date_depart >= aujourdHui)
-    .slice(0, 3)
 
   return (
     <section className="page">
       <h1>Tableau de bord</h1>
-      <p className="status" role="status">{connexion}</p>
+      {tableau ? (
+        <div className="resume" role="status">
+          <h2>{tableau.libelle_date}</h2>
+          <p>{tableau.phrase}</p>
+          <p>
+            Arrivées du jour : {tableau.arrivees_aujourdhui.length === 0
+              ? 'aucune'
+              : tableau.arrivees_aujourdhui.map((sejour) => `${sejour.client_nom} (${sejour.logement_nom})`).join(', ')}
+          </p>
+          <p>
+            Départs du jour : {tableau.departs_aujourdhui.length === 0
+              ? 'aucun'
+              : tableau.departs_aujourdhui.map((sejour) => `${sejour.client_nom} (${sejour.logement_nom})`).join(', ')}
+          </p>
+        </div>
+      ) : null}
 
       <div className="barre-logements">
         <h2>Logements</h2>
@@ -273,6 +276,9 @@ export default function Dashboard() {
                   ? 'Localisation à compléter'
                   : `${logement.ville}, ${logement.pays_libelle}`}
               </p>
+              <p className={classeStatut(logement.statut_du_jour?.etat)}>
+                {logement.statut_du_jour?.libelle || 'Statut indisponible'}
+              </p>
               <button type="button" className="bouton bouton-secondaire" onClick={() => ouvrirModification(logement)}>
                 Modifier
               </button>
@@ -281,28 +287,43 @@ export default function Dashboard() {
         </ul>
       )}
 
-      {synthese ? (
+      {tableau ? (
         <div className="montants">
-          <p className="montant"><span>À recevoir</span>{formatFcfa(synthese.reste_a_recevoir)}</p>
-          <p className="montant"><span>Encaissé</span>{formatFcfa(synthese.montant_encaisse)}</p>
-          <p className="montant"><span>Dépenses</span>{formatFcfa(synthese.depenses)}</p>
+          <p className="montant"><span>À recevoir</span>{formatFcfa(tableau.reste_a_recevoir)}</p>
+          <p className="montant"><span>Encaissé</span>{formatFcfa(tableau.montant_encaisse)}</p>
+          <p className="montant"><span>Dépenses</span>{formatFcfa(tableau.depenses)}</p>
+          {tableau.montant_encaisse_annule > 0 ? (
+            <p className="montant">
+              <span>Encaissé sur un séjour annulé</span>
+              {formatFcfa(tableau.montant_encaisse_annule)}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
-      <h2 className="sous-titre">Prochains séjours</h2>
-      {prochains.length === 0 ? (
-        <p className="vide">Aucune arrivée prévue.</p>
-      ) : (
+      <h2 className="sous-titre">Prochaines arrivées</h2>
+      {tableau && tableau.prochaines_arrivees.length === 0 ? (
+        <p className="vide">Aucune arrivée à venir.</p>
+      ) : null}
+      {tableau && tableau.prochaines_arrivees.length > 0 ? (
         <ul className="cartes">
-          {prochains.map((reservation) => (
-            <li key={reservation.id} className="carte">
-              <h3>{reservation.client_nom}</h3>
-              <p>{reservation.logement_nom}</p>
-              <p>{reservation.date_arrivee} → {reservation.date_depart}</p>
-            </li>
+          {tableau.prochaines_arrivees.map((sejour) => (
+            <LigneSejour key={sejour.id} sejour={sejour} />
           ))}
         </ul>
-      )}
+      ) : null}
+
+      <h2 className="sous-titre">Prochains départs</h2>
+      {tableau && tableau.prochains_departs.length === 0 ? (
+        <p className="vide">Aucun départ à venir.</p>
+      ) : null}
+      {tableau && tableau.prochains_departs.length > 0 ? (
+        <ul className="cartes">
+          {tableau.prochains_departs.map((sejour) => (
+            <LigneSejour key={`depart-${sejour.id}`} sejour={sejour} />
+          ))}
+        </ul>
+      ) : null}
     </section>
   )
 }
