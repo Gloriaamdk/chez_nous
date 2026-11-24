@@ -5,3 +5,16 @@ backend/.tmp-*.sqlite3
 *.py[cod]
 node_modules/
 dist/
+
+# Secrets. Le modèle backend/.env.example reste versionné.
+.env
+.env.*
+!.env.example
+
+# Environnements virtuels, y compris à la racine du dépôt.
+venv/
+.venv/
+
+# Fichiers générés par Django (médias envoyés, collectstatic).
+media/
+staticfiles/
