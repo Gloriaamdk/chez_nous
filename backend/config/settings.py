@@ -11,22 +11,46 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 """
 
 import os
+import secrets
 from pathlib import Path
+
+import environ
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+env = environ.Env()
+
+# backend/.env est local et n'est pas versionné. S'il manque, les défauts
+# ci-dessous permettent de lancer l'application et les tests.
+_env_file = BASE_DIR / '.env'
+if _env_file.is_file():
+    env.read_env(_env_file)
 
 
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/5.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-f)up0s7q99!g_te+6=z&c!ok9n#8$l1s*umuextp^+#0zl3rt4'
+# Faux tant que DEBUG n'est pas défini dans l'environnement ou dans backend/.env.
+DEBUG = env.bool('DEBUG', default=False)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Aucune clé n'est versionnée. Sans SECRET_KEY, une clé temporaire permet de
+# démarrer en local. Elle change à chaque lancement : renseignez backend/.env
+# pour garder une clé stable. L'ancienne clé publiée est compromise.
+_secret = env.str('SECRET_KEY', default='').strip()
+if _secret:
+    SECRET_KEY = _secret
+else:
+    _alphabet = 'abcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*(-_=+)'
+    SECRET_KEY = ''.join(secrets.choice(_alphabet) for _ in range(50))
 
-ALLOWED_HOSTS = []
+# En développement, la machine locale reste autorisée.
+_hotes_locaux = ['localhost', '127.0.0.1', '[::1]']
+ALLOWED_HOSTS = [
+    hote.strip()
+    for hote in env.list('ALLOWED_HOSTS', default=_hotes_locaux)
+    if hote.strip()
+]
 
 
 # Application definition
@@ -105,9 +129,10 @@ AUTH_PASSWORD_VALIDATORS = [
 # Internationalization
 # https://docs.djangoproject.com/en/5.2/topics/i18n/
 
-LANGUAGE_CODE = 'en-us'
+LANGUAGE_CODE = 'fr-fr'
 
-TIME_ZONE = 'UTC'
+# La propriétaire est au Togo. Lomé reste à UTC+0 toute l'année.
+TIME_ZONE = 'Africa/Lome'
 
 USE_I18N = True
 

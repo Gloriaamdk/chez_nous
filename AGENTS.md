@@ -81,4 +81,12 @@ Mettre à jour la section Avancement après chaque vérification.
   - Bilan d’occupation, d’encaissements et de dépenses, par logement et au total.
   - Chaque bilan est comparé à la semaine ou au mois précédent.
   - Les exemples chiffrés restent dans la base de test.
-- Prochaine étape : prévoir la synchronisation Airbnb, sans partenaire choisi pour l’instant.
+- Terminé : configuration du backend sécurisée, vérifiée.
+  - `SECRET_KEY`, `DEBUG` et `ALLOWED_HOSTS` sont lus avec `django-environ` (épinglé dans `backend/requirements.txt`).
+  - Aucune clé n’est versionnée. Le modèle sans secret est `backend/.env.example`.
+  - `DEBUG` est faux tant qu’il n’est pas défini. En local, l’exemple active `DEBUG` et autorise localhost.
+  - Le `.gitignore` ignore `.env`, les environnements virtuels à la racine, `media/` et `staticfiles/`.
+  - Langue `fr-fr`, fuseau `Africa/Lome`, `USE_TZ` reste activé.
+  - L’ancienne clé publiée est compromise : en générer une nouvelle dans `backend/.env`.
+  - `manage.py check` et `manage.py test` passent. L’API locale répond toujours sur `/api/status/`.
+- Prochaine étape : authentification de l’API, sans modifier le frontend. La synchronisation Airbnb reste à prévoir, sans partenaire choisi pour l’instant.
