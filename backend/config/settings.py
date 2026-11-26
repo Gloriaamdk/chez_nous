@@ -194,3 +194,21 @@ SESSION_COOKIE_SAMESITE = 'Lax'
 # Avec DEBUG à False, les cookies ne partent qu'en HTTPS.
 SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=not DEBUG)
 CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=not DEBUG)
+
+# Boîte mail lue seule pour compléter les séjours Airbnb. Vide : pas de lecture.
+# Le mot de passe est un mot de passe d'application, jamais le mot de passe du compte.
+AIRBNB_IMAP = {
+    'hote': env.str('AIRBNB_IMAP_HOTE', default='').strip(),
+    'port': env.int('AIRBNB_IMAP_PORT', default=993),
+    'utilisateur': env.str('AIRBNB_IMAP_UTILISATEUR', default='').strip(),
+    'mot_de_passe': env.str('AIRBNB_IMAP_MOT_DE_PASSE', default=''),
+    'dossier': env.str('AIRBNB_IMAP_DOSSIER', default='INBOX').strip() or 'INBOX',
+    'expediteurs': [
+        adresse.strip()
+        for adresse in env.list(
+            'AIRBNB_IMAP_EXPEDITEURS',
+            default=['automated@airbnb.com', 'express@airbnb.com'],
+        )
+        if adresse.strip()
+    ],
+}

@@ -19,6 +19,9 @@ const formulaireVide = {
   date_depart: '',
   montant_prevu: '',
   acompte: '',
+  blocage: false,
+  code_airbnb: '',
+  nombre_voyageurs: '',
 }
 
 function messageErreur(error) {
@@ -106,6 +109,9 @@ export default function Reservations({ brouillon }) {
       date_depart: reservation.date_depart,
       montant_prevu: String(reservation.montant_prevu),
       acompte: '',
+      blocage: Boolean(reservation.blocage),
+      code_airbnb: reservation.code_airbnb || '',
+      nombre_voyageurs: reservation.nombre_voyageurs ? String(reservation.nombre_voyageurs) : '',
     })
     setOuvert(true)
   }
@@ -128,7 +134,15 @@ export default function Reservations({ brouillon }) {
       mode: formulaire.mode,
       date_arrivee: formulaire.date_arrivee,
       date_depart: formulaire.date_depart,
-      montant_prevu: Number(formulaire.montant_prevu),
+    }
+    if (!formulaire.blocage) {
+      payload.montant_prevu = Number(formulaire.montant_prevu)
+    }
+    if (formulaire.canal === 'airbnb') {
+      payload.code_airbnb = formulaire.code_airbnb.trim().toUpperCase()
+      payload.nombre_voyageurs = formulaire.nombre_voyageurs
+        ? Number(formulaire.nombre_voyageurs)
+        : null
     }
     try {
       if (edition) {
@@ -248,10 +262,35 @@ export default function Reservations({ brouillon }) {
               ))}
             </select>
           </label>
-          <label>
-            {formulaire.mode === 'mois' ? 'Loyer mensuel (FCFA)' : 'Montant du séjour (FCFA)'}
-            <input name="montant_prevu" type="number" min="1" step="1" value={formulaire.montant_prevu} onChange={modifierChamp} required />
-          </label>
+          {formulaire.blocage ? (
+            <p className="intro">
+              Blocage Airbnb : ces dates restent occupées, sans montant à recevoir.
+              La prochaine synchronisation peut les réécrire.
+            </p>
+          ) : (
+            <label>
+              {formulaire.mode === 'mois' ? 'Loyer mensuel (FCFA)' : 'Montant du séjour (FCFA)'}
+              <input name="montant_prevu" type="number" min="1" step="1" value={formulaire.montant_prevu} onChange={modifierChamp} required />
+            </label>
+          )}
+          {formulaire.canal === 'airbnb' && !formulaire.blocage ? (
+            <p className="intro">
+              Séjour Airbnb. Le calendrier ne donne ni le nom ni le prix : les e-mails les complètent,
+              sinon saisissez-les ici.
+            </p>
+          ) : null}
+          {formulaire.canal === 'airbnb' ? (
+            <>
+              <label>
+                Code de confirmation
+                <input name="code_airbnb" value={formulaire.code_airbnb} onChange={modifierChamp} autoComplete="off" />
+              </label>
+              <label>
+                Voyageurs
+                <input name="nombre_voyageurs" type="number" min="1" step="1" value={formulaire.nombre_voyageurs} onChange={modifierChamp} />
+              </label>
+            </>
+          ) : null}
           {edition ? (
             <p className="intro">
               {edition.montantEncaisse > 0
@@ -282,6 +321,17 @@ export default function Reservations({ brouillon }) {
               <p>{reservation.logement_nom}</p>
               <p>{reservation.date_arrivee} → {reservation.date_depart}</p>
               <p>{reservation.mode_libelle} · {reservation.canal_libelle}</p>
+              {reservation.blocage ? <p className="badge-blocage">Blocage Airbnb</p> : null}
+              {!reservation.annulee && !reservation.blocage && reservation.canal === 'airbnb' && reservation.montant_prevu === 0 ? (
+                <p className="badge-airbnb">À compléter</p>
+              ) : null}
+              {reservation.code_airbnb ? <p>Code Airbnb : {reservation.code_airbnb}</p> : null}
+              {reservation.nombre_voyageurs ? (
+                <p>{reservation.nombre_voyageurs} voyageur{reservation.nombre_voyageurs > 1 ? 's' : ''}</p>
+              ) : null}
+              {reservation.blocage ? (
+                <p>Ces dates sont occupées. Ce blocage ne compte pas dans les sommes à recevoir.</p>
+              ) : null}
               {reservation.annulee ? (
                 <>
                   <p className="badge-annulee">Annulée{reservation.annulee_le ? ` le ${reservation.annulee_le}` : ''}</p>

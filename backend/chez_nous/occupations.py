@@ -39,25 +39,20 @@ def _sejour(reservation):
     }
 
 
-def statut_du_jour(reservations, jour):
-    """Statut d'un logement pour une date, à partir de ses réservations actives.
-
-    Le jour du départ n'est pas une nuit occupée. Une arrivée et un départ
-    le même jour donnent une rotation : le nouveau client reste le soir.
-    """
-    actives = [reservation for reservation in reservations if not reservation.annulee]
+def _statut_clients(sejours, jour):
+    """Statut calculé sur les séjours, sans les blocages Airbnb."""
     arrivee = next(
-        (reservation for reservation in actives if reservation.date_arrivee == jour),
+        (reservation for reservation in sejours if reservation.date_arrivee == jour),
         None,
     )
     depart = next(
-        (reservation for reservation in actives if reservation.date_depart == jour),
+        (reservation for reservation in sejours if reservation.date_depart == jour),
         None,
     )
     occupant = next(
         (
             reservation
-            for reservation in actives
+            for reservation in sejours
             if reservation.date_arrivee <= jour < reservation.date_depart
         ),
         None,
@@ -111,7 +106,47 @@ def statut_du_jour(reservations, jour):
     return dict(STATUT_LIBRE)
 
 
-def _phrase(nb_logements, libres, occupes, arrivees, departs):
+STATUT_BLOCAGE = {
+    "etat": "blocage",
+    "libelle": "Indisponible · Airbnb",
+    "client_nom": "",
+    "date_depart": None,
+    "date_depart_libelle": "",
+    "client_depart": "",
+}
+
+
+def statut_du_jour(reservations, jour):
+    """Statut d'un logement pour une date, à partir de ses réservations actives.
+
+    Le jour du départ n'est pas une nuit occupée. Une arrivée et un départ
+    le même jour donnent une rotation : le nouveau client reste le soir.
+    Un blocage Airbnb occupe les nuits sans être présenté comme un client.
+    """
+    actives = [reservation for reservation in reservations if not reservation.annulee]
+    sejours = [reservation for reservation in actives if not reservation.blocage]
+    blocages = [reservation for reservation in actives if reservation.blocage]
+    statut = _statut_clients(sejours, jour)
+    bloque_ce_soir = any(
+        blocage.date_arrivee <= jour < blocage.date_depart for blocage in blocages
+    )
+    if not bloque_ce_soir or statut["etat"] not in {"libre", "depart"}:
+        return statut
+    if statut["etat"] == "depart":
+        return {
+            "etat": "blocage",
+            "libelle": (
+                f"Départ de {statut['client_depart']} · indisponible ensuite (Airbnb)"
+            ),
+            "client_nom": "",
+            "date_depart": None,
+            "date_depart_libelle": "",
+            "client_depart": statut["client_depart"],
+        }
+    return dict(STATUT_BLOCAGE)
+
+
+def _phrase(nb_logements, libres, occupes, arrivees, departs, indisponibles=0):
     """Résumé du jour.
 
     ``libres`` et ``occupes`` ne comptent que les logements sans mouvement
@@ -120,11 +155,11 @@ def _phrase(nb_logements, libres, occupes, arrivees, departs):
     """
     if nb_logements == 0:
         return "Aucun logement pour le moment."
-    if occupes == 0 and arrivees == 0 and departs == 0:
+    if occupes == 0 and arrivees == 0 and departs == 0 and indisponibles == 0:
         if nb_logements == 1:
             return "Aujourd’hui, le logement est libre."
         return f"Aujourd’hui, les {nb_logements} logements sont libres."
-    if libres == 0 and arrivees == 0 and departs == 0:
+    if libres == 0 and arrivees == 0 and departs == 0 and indisponibles == 0:
         if nb_logements == 1:
             return "Aujourd’hui, le logement est occupé."
         return f"Aujourd’hui, les {nb_logements} logements sont occupés."
@@ -140,6 +175,10 @@ def _phrase(nb_logements, libres, occupes, arrivees, departs):
         morceaux.append("1 arrivée" if arrivees == 1 else f"{arrivees} arrivées")
     if departs:
         morceaux.append("1 départ" if departs == 1 else f"{departs} départs")
+    if indisponibles:
+        morceaux.append(
+            "1 indisponible" if indisponibles == 1 else f"{indisponibles} indisponibles"
+        )
     return "Aujourd’hui : " + ", ".join(morceaux) + "."
 
 
@@ -155,14 +194,16 @@ def _prochains(reservations, attribut, jour, limite=3):
 
 def construire_tableau(logements, reservations, jour, finances):
     actives = [reservation for reservation in reservations if not reservation.annulee]
+    sejours = [reservation for reservation in actives if not reservation.blocage]
     par_logement = {}
     for reservation in actives:
         par_logement.setdefault(reservation.logement_id, []).append(reservation)
 
-    libres = occupes = arrivees = departs = 0
+    libres = occupes = arrivees = departs = indisponibles = 0
     disponibles = en_sejour = 0
     for logement in logements:
-        etat = statut_du_jour(par_logement.get(logement.id, []), jour)["etat"]
+        statut = statut_du_jour(par_logement.get(logement.id, []), jour)
+        etat = statut["etat"]
         if etat == "libre":
             libres += 1
             disponibles += 1
@@ -179,21 +220,25 @@ def construire_tableau(logements, reservations, jour, finances):
             arrivees += 1
             departs += 1
             en_sejour += 1
+        elif etat == "blocage":
+            indisponibles += 1
+            if statut["client_depart"]:
+                departs += 1
 
-    arrivees_jour = [_sejour(reservation) for reservation in actives if reservation.date_arrivee == jour]
-    departs_jour = [_sejour(reservation) for reservation in actives if reservation.date_depart == jour]
+    arrivees_jour = [_sejour(reservation) for reservation in sejours if reservation.date_arrivee == jour]
+    departs_jour = [_sejour(reservation) for reservation in sejours if reservation.date_depart == jour]
     arrivees_jour.sort(key=lambda item: (item["logement_nom"], item["id"]))
     departs_jour.sort(key=lambda item: (item["logement_nom"], item["id"]))
 
     return {
         "date": jour.isoformat(),
         "libelle_date": libelle_jour(jour),
-        "phrase": _phrase(len(logements), libres, occupes, arrivees, departs),
+        "phrase": _phrase(len(logements), libres, occupes, arrivees, departs, indisponibles),
         "logements_libres": disponibles,
         "logements_occupes": en_sejour,
         "arrivees_aujourdhui": arrivees_jour,
         "departs_aujourdhui": departs_jour,
-        "prochaines_arrivees": _prochains(actives, "date_arrivee", jour),
-        "prochains_departs": _prochains(actives, "date_depart", jour),
+        "prochaines_arrivees": _prochains(sejours, "date_arrivee", jour),
+        "prochains_departs": _prochains(sejours, "date_depart", jour),
         **finances,
     }

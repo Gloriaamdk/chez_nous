@@ -4,6 +4,7 @@ from django.db.models import Sum
 from django.utils import timezone
 from rest_framework import serializers
 
+from .airbnb import MESSAGE_URL, url_airbnb_valide
 from .models import (
     MESSAGE_LOGEMENT_OCCUPE,
     Depense,
@@ -23,6 +24,9 @@ class LogementSerializer(serializers.ModelSerializer):
     pays_libelle = serializers.SerializerMethodField()
     localisation_a_completer = serializers.BooleanField(read_only=True)
     statut_du_jour = serializers.SerializerMethodField()
+    chemin_ical = serializers.SerializerMethodField()
+    synchro_le = serializers.DateTimeField(read_only=True)
+    synchro_resultat = serializers.JSONField(read_only=True)
 
     class Meta:
         model = Logement
@@ -36,6 +40,11 @@ class LogementSerializer(serializers.ModelSerializer):
             "ville",
             "localisation_a_completer",
             "statut_du_jour",
+            "url_ical_airbnb",
+            "annonce_airbnb",
+            "chemin_ical",
+            "synchro_le",
+            "synchro_resultat",
         ]
         read_only_fields = ["id"]
 
@@ -47,6 +56,20 @@ class LogementSerializer(serializers.ModelSerializer):
         if reservations is None:
             reservations = list(logement.reservations.filter(annulee=False))
         return statut_du_jour(reservations, timezone.localdate())
+
+    def get_chemin_ical(self, logement):
+        return f"/api/logements/{logement.id}/calendrier/{logement.jeton_ical}.ics"
+
+    def validate_url_ical_airbnb(self, value):
+        value = (value or "").strip()
+        if not value:
+            return ""
+        if not url_airbnb_valide(value):
+            raise serializers.ValidationError(MESSAGE_URL)
+        return value
+
+    def validate_annonce_airbnb(self, value):
+        return (value or "").strip()
 
     def validate_nom(self, value):
         value = value.strip()
@@ -149,6 +172,7 @@ class ReservationSerializer(serializers.ModelSerializer):
     acompte = serializers.IntegerField(write_only=True, required=False, min_value=0)
     annulee = serializers.BooleanField(read_only=True)
     annulee_le = serializers.DateField(read_only=True)
+    blocage = serializers.BooleanField(read_only=True)
 
     class Meta:
         model = Reservation
@@ -171,9 +195,12 @@ class ReservationSerializer(serializers.ModelSerializer):
             "reste_a_recevoir",
             "annulee",
             "annulee_le",
+            "blocage",
+            "code_airbnb",
+            "nombre_voyageurs",
             "echeances",
         ]
-        read_only_fields = ["id", "annulee", "annulee_le"]
+        read_only_fields = ["id", "annulee", "annulee_le", "blocage"]
 
     def get_montant_total_prevu(self, reservation):
         if reservation.annulee:
@@ -202,6 +229,8 @@ class ReservationSerializer(serializers.ModelSerializer):
 
     def validate_montant_prevu(self, value):
         if value <= 0:
+            if getattr(self.instance, "blocage", False):
+                return 0
             raise serializers.ValidationError("Indiquez le montant prévu.")
         return value
 
@@ -223,6 +252,23 @@ class ReservationSerializer(serializers.ModelSerializer):
 
         if logement and arrivee and depart and self._occupe(logement, arrivee, depart):
             raise serializers.ValidationError(MESSAGE_LOGEMENT_OCCUPE)
+
+        code = (attrs.get("code_airbnb", getattr(instance, "code_airbnb", "")) or "").strip().upper()
+        if "code_airbnb" in attrs:
+            attrs["code_airbnb"] = code
+        if code:
+            doubles = Reservation.objects.filter(code_airbnb=code)
+            if instance is not None:
+                doubles = doubles.exclude(pk=instance.pk)
+            if doubles.exists():
+                raise serializers.ValidationError(
+                    {"code_airbnb": "Ce code de confirmation est déjà utilisé."}
+                )
+        nombre = attrs.get("nombre_voyageurs", getattr(instance, "nombre_voyageurs", None))
+        if nombre is not None and nombre < 1:
+            raise serializers.ValidationError(
+                {"nombre_voyageurs": "Indiquez le nombre de voyageurs."}
+            )
 
         if mode and montant and arrivee and depart:
             total = montant * len(dates_echeances(mode, arrivee, depart))
@@ -259,6 +305,8 @@ class ReservationSerializer(serializers.ModelSerializer):
 
     def update(self, instance, validated_data):
         validated_data.pop("acompte", None)
+        if instance.blocage:
+            validated_data.pop("montant_prevu", None)
         avant = (
             instance.mode,
             instance.date_arrivee,
@@ -276,7 +324,7 @@ class ReservationSerializer(serializers.ModelSerializer):
                     instance.date_depart,
                     instance.montant_prevu,
                 )
-                if apres != avant:
+                if apres != avant and not instance.blocage:
                     instance.generer_echeances()
                     cache = getattr(instance, "_prefetched_objects_cache", None)
                     if cache is not None:

@@ -85,7 +85,9 @@ def _indicateurs(logements, reservations, paiements, depenses, debut, fin):
         nuits = sum(
             nuits_communes(reservation.date_arrivee, reservation.date_depart, debut, fin)
             for reservation in reservations
-            if reservation.logement_id == logement.id and not reservation.annulee
+            if reservation.logement_id == logement.id
+            and not reservation.annulee
+            and not reservation.blocage
         )
         encaisse = sum(
             paiement.montant

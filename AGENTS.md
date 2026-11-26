@@ -36,9 +36,12 @@ WhatsApp et du téléphone.
 - Rapports : générer automatiquement un bilan hebdomadaire et mensuel avec
   l’occupation, les encaissements et les dépenses, par logement et au total.
   Permettre de comparer les résultats à la période précédente.
-- Airbnb : prévoir la remontée automatique des réservations et la mise à jour
-  des disponibilités après une réservation directe. Le partenaire reste à choisir.
-  Afficher la date de la dernière synchronisation réussie.
+- Airbnb : les calendriers passent par les liens iCal des hôtes. L’appli
+ importe les séjours et les blocages, et publie un lien pour bloquer sur
+ Airbnb les nuits prises par WhatsApp ou par téléphone. Les e-mails de
+ confirmation complètent le nom, les voyageurs, le versement prévu et le code.
+ Afficher la date et le résultat de la dernière synchronisation, et ceux de
+ la dernière lecture des e-mails.
 
 ## Méthode de travail
 Avancer étape par étape. Après chaque étape, expliquer en français ce qui a été
@@ -106,4 +109,15 @@ Mettre à jour la section Avancement après chaque vérification.
   - Sur Windows, dans `backend`, environnement virtuel activé : `python manage.py migrate`, puis `python manage.py test`.
   - `manage.py check` : aucun problème. `manage.py test` : 30 tests, OK. `npm run build` : compilation réussie.
   - Parcours navigateur : statuts du jour, modification sans perdre l’acompte, annulation, dates libérées, encaissement conservé.
-- Prochaine étape : prévoir la synchronisation Airbnb, sans partenaire choisi pour l’instant.
+- Terminé : synchronisation Airbnb par iCal, dans les deux sens, et lecture des e-mails, vérifiées.
+ - Bibliothèque `icalendar` 7.3.2, dans `backend/requirements.txt`, avec `python-dateutil` et `typing-extensions`.
+ - Chaque logement a l’adresse d’export Airbnb, le nom de l’annonce, un jeton secret pour le lien public, la date et le résultat de la dernière synchro.
+ - `python manage.py synchro_airbnb` et le bouton « Synchroniser maintenant » créent, mettent à jour ou annulent les séjours selon l’UID iCal. Le jour du départ n’est pas occupé. Un blocage « Not available » occupe les nuits sans montant. Un conflit avec un séjour déjà saisi est signalé, sans plantage et sans effacer les paiements.
+ - Le lien `/api/logements/<id>/calendrier/<jeton>.ics` est public. Sans le bon jeton, il répond 404. Il ne contient que « Réservé », pour les séjours WhatsApp et téléphone non annulés.
+ - `python manage.py synchro_airbnb --boucle --intervalle 20` relance calendriers et e-mails toutes les 20 minutes (15 à 30). La même commande, une fois, sert à la tâche planifiée Windows ou à cron.
+ - `python manage.py lire_emails_airbnb` lit la boîte en IMAP, sans rien supprimer. Réglages dans `backend/.env` : hôte, port, utilisateur, mot de passe d’application, dossier, expéditeurs. Les messages déjà lus sont reconnus par leur Message-ID. Le corps du message n’est pas enregistré.
+ - Un e-mail avant le calendrier crée le séjour ; le calendrier le retrouve par le code ou par les dates, sans doublon. Une annulation garde l’historique et les encaissements. Le versement de l’e-mail devient le montant prévu, pas un encaissement.
+ - Sur Windows, dans `backend`, environnement virtuel activé : `python -m pip install -r requirements.txt`, puis `python manage.py migrate`, puis `python manage.py test`.
+ - `manage.py check` : aucun problème. `manage.py test` : 53 tests, OK. `npm run build` : compilation réussie.
+ - Parcours navigateur : fiche du logement (lien Airbnb, lien à copier, résultat, bouton), réservation à compléter, blocage, dernière lecture des e-mails.
+- Prochaine étape : publier l’application sur une adresse internet, pour qu’Airbnb puisse lire le lien d’export. Tant que le site n’est que sur le PC, l’import (Airbnb vers l’appli) fonctionne ; l’export (l’appli vers Airbnb) attend que ce lien soit joignable.

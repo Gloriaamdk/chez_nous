@@ -1,13 +1,19 @@
+import secrets
 import uuid
 from datetime import timedelta
 
 from django.core.exceptions import ValidationError
 from django.db import IntegrityError, connection, models, transaction
-from django.db.models import F
+from django.db.models import F, Q
 
 from .sejours import dates_echeances
 
 MESSAGE_LOGEMENT_OCCUPE = "Ce logement est déjà réservé sur ces dates."
+
+
+def generer_jeton_ical():
+    """Jeton d’un lien de calendrier. Assez long pour ne pas être deviné."""
+    return secrets.token_urlsafe(32)
 
 
 class Logement(models.Model):
@@ -23,6 +29,36 @@ class Logement(models.Model):
     type = models.CharField("type", max_length=32, choices=Type.choices)
     pays = models.CharField("pays", max_length=2, blank=True)
     ville = models.CharField("ville", max_length=120, blank=True)
+    url_ical_airbnb = models.URLField(
+        "adresse iCal Airbnb",
+        max_length=500,
+        blank=True,
+        default="",
+    )
+    jeton_ical = models.CharField(
+        "jeton du calendrier",
+        max_length=64,
+        unique=True,
+        default=generer_jeton_ical,
+        editable=False,
+    )
+    synchro_le = models.DateTimeField(
+        "dernière synchronisation",
+        null=True,
+        blank=True,
+    )
+    synchro_resultat = models.JSONField(
+        "résultat de synchronisation",
+        default=dict,
+        blank=True,
+    )
+    annonce_airbnb = models.CharField(
+        "annonce Airbnb",
+        max_length=160,
+        blank=True,
+        default="",
+        help_text="Nom ou identifiant de l’annonce, tel qu’il apparaît dans les e-mails Airbnb.",
+    )
 
     class Meta:
         ordering = ["nom", "id"]
@@ -94,6 +130,23 @@ class Reservation(models.Model):
     montant_prevu = models.PositiveIntegerField("montant prévu")
     annulee = models.BooleanField("annulée", default=False)
     annulee_le = models.DateField("annulée le", null=True, blank=True)
+    uid_ical = models.CharField("identifiant iCal", max_length=255, blank=True, default="")
+    blocage = models.BooleanField(
+        "blocage",
+        default=False,
+        help_text="Dates bloquées sur Airbnb, sans client ni montant à recevoir.",
+    )
+    code_airbnb = models.CharField(
+        "code de confirmation",
+        max_length=20,
+        blank=True,
+        default="",
+    )
+    nombre_voyageurs = models.PositiveSmallIntegerField(
+        "nombre de voyageurs",
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         ordering = ["annulee", "date_arrivee", "id"]
@@ -103,6 +156,16 @@ class Reservation(models.Model):
             models.CheckConstraint(
                 condition=models.Q(date_depart__gt=models.F("date_arrivee")),
                 name="reservation_depart_apres_arrivee",
+            ),
+            models.UniqueConstraint(
+                fields=["logement", "uid_ical"],
+                condition=~Q(uid_ical=""),
+                name="uid_ical_unique_par_logement",
+            ),
+            models.UniqueConstraint(
+                fields=["code_airbnb"],
+                condition=~Q(code_airbnb=""),
+                name="code_airbnb_unique",
             ),
         ]
 
@@ -252,6 +315,35 @@ class NuitOccupee(models.Model):
 
     def __str__(self):
         return f"{self.logement} · {self.date}"
+
+
+class MessageEmailTraite(models.Model):
+    """Message déjà lu. Le corps de l’e-mail n’est pas conservé."""
+
+    message_id = models.CharField("identifiant du message", max_length=500, unique=True)
+    traite_le = models.DateTimeField("traité le", auto_now_add=True)
+
+    class Meta:
+        ordering = ["-traite_le", "id"]
+        verbose_name = "message traité"
+        verbose_name_plural = "messages traités"
+
+    def __str__(self):
+        return self.message_id
+
+
+class LectureEmails(models.Model):
+    """Résultat de la dernière lecture de la boîte mail. Une seule ligne suffit."""
+
+    le = models.DateTimeField("lue le", null=True, blank=True)
+    resultat = models.JSONField("résultat", default=dict, blank=True)
+
+    class Meta:
+        verbose_name = "lecture des e-mails"
+        verbose_name_plural = "lectures des e-mails"
+
+    def __str__(self):
+        return "Dernière lecture des e-mails"
 
 
 class Depense(models.Model):

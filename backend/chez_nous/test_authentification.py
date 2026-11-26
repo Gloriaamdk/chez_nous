@@ -13,6 +13,7 @@ LECTURES = [
     "/api/synthese/",
     "/api/tableau-de-bord/",
     "/api/rapports/",
+    "/api/airbnb/lecture/",
     "/api/auth/moi/",
 ]
 

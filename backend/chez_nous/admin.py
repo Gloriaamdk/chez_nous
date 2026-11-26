@@ -22,7 +22,7 @@ class LogementAdminForm(forms.ModelForm):
 
     class Meta:
         model = Logement
-        fields = ("nom", "type", "pays", "ville")
+        fields = ("nom", "type", "pays", "ville", "url_ical_airbnb", "annonce_airbnb")
 
 
 @admin.register(Logement)
@@ -65,6 +65,9 @@ class ReservationAdmin(admin.ModelAdmin):
         "canal",
         "montant_prevu",
         "annulee",
+        "blocage",
+        "code_airbnb",
+        "nombre_voyageurs",
     )
 
 
