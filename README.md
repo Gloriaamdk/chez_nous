@@ -32,7 +32,11 @@ python manage.py runserver
 
 L'API écoute sur http://127.0.0.1:8000 . http://127.0.0.1:8000/api/status/ renvoie `{"status": "ok"}`. Cette adresse de contrôle reste publique. Tout le reste (logements, réservations, paiements, dépenses, rapports) exige une connexion.
 
-Si l'environnement virtuel existe déjà, activez-le et relancez `python -m pip install -r requirements.txt` pour installer `django-environ`.
+Si l'environnement virtuel existe déjà, activez-le et relancez `python -m pip install -r requirements.txt`. Cela installe les nouveautés, dont `django-environ` et `icalendar`. Puis :
+
+```bat
+python manage.py migrate
+```
 
 `SECRET_KEY`, `DEBUG` et `ALLOWED_HOSTS` sont lus dans `backend/.env`. Sans variable `DEBUG`, le mode débogage est désactivé. Le fichier d'exemple le laisse activé en local, comme auparavant, et autorise `localhost`, `127.0.0.1` et `[::1]`.
 
@@ -73,6 +77,99 @@ Si Vite n'utilise pas le port 5173, ou si le téléphone ouvre une adresse du ty
 ```
 CSRF_TRUSTED_ORIGINS=http://localhost:5173,http://127.0.0.1:5173,http://192.168.1.12:5173
 ```
+
+## Calendriers Airbnb
+
+Airbnb n’ouvre pas d’API aux petits hôtes. On utilise les liens de calendrier `.ics`, dans les deux sens. Rien à ressaisir : la commande automatique et les e-mails s’en chargent.
+
+### Recevoir les séjours Airbnb dans Chez Nous
+
+1. Sur Airbnb, ouvrez le calendrier du logement, puis Disponibilité, puis **Exporter le calendrier**.
+2. Copiez le lien (il commence par `https://www.airbnb.com/`).
+3. Dans Chez Nous, ouvrez le logement, collez ce lien dans « Lien d’export Airbnb », et enregistrez.
+4. Indiquez aussi le **nom de l’annonce**, exactement comme dans les e-mails Airbnb (par exemple `Studio Lomé`). C’est ce qui rattache le bon message au bon logement.
+5. Appuyez sur **Synchroniser maintenant**, ou laissez la commande automatique le faire.
+
+Chaque séjour arrive avec le nom « Client Airbnb » et un téléphone « À compléter ». Le blocage « Not available » occupe les dates, sans montant à recevoir. Si ces dates sont déjà prises chez vous (WhatsApp ou téléphone), la synchro ne plante pas : elle affiche le conflit, sur l’écran et dans la commande. L’argent déjà encaissé n’est pas effacé.
+
+### Bloquer ces dates sur Airbnb
+
+1. Dans la fiche du logement, copiez « Lien à coller dans Airbnb ».
+2. Sur Airbnb : Calendrier, Disponibilité, **Importer un calendrier**, collez le lien.
+3. Airbnb bloque alors les nuits déjà réservées par WhatsApp ou par téléphone. Le fichier ne contient aucun nom ni téléphone, seulement « Réservé ».
+
+Ce lien contient un jeton secret. Le bouton **Nouveau lien** l’invalide : il faudra alors recoller le nouveau dans Airbnb.
+
+Airbnb ne peut lire ce lien que si Chez Nous est joignable sur internet. Tant que l’application n’est que sur le PC, l’import (Airbnb vers Chez Nous) fonctionne ; l’export (Chez Nous vers Airbnb) attend une adresse publique.
+
+### Lancer la synchronisation toute seule
+
+Une seule commande lit les calendriers **et** les e-mails, puis recommence. L’intervalle est entre 15 et 30 minutes. 20 est un bon choix : assez souvent pour un appel, sans interroger Airbnb en permanence.
+
+Dans `backend`, environnement virtuel activé :
+
+```bat
+python manage.py synchro_airbnb --boucle --intervalle 20
+```
+
+Laissez cette fenêtre ouverte. `Ctrl+C` arrête. Pour un seul passage : `python manage.py synchro_airbnb`. Pour ne lire que les e-mails : `python manage.py lire_emails_airbnb`.
+
+Pourquoi une boucle, et pas seulement une tâche planifiée : c’est la même commande sur Windows et sur un serveur, elle fait les calendriers et les e-mails ensemble, et on voit le résultat dans la fenêtre. Aucun service supplémentaire à installer.
+
+Pour qu’elle démarre avec Windows, créez une tâche planifiée :
+
+1. Ouvrez le menu Démarrer, cherchez **Planificateur de tâches**, puis **Créer une tâche**.
+2. Déclencheur : **À l’ouverture de session**.
+3. Action : **Démarrer un programme**.
+4. Programme : le `python.exe` de l’environnement virtuel, par exemple `C:\chemin\chez_nous\backend\.venv\Scripts\python.exe`.
+5. Arguments : `manage.py synchro_airbnb --boucle --intervalle 20`.
+6. « Commencer dans » : le dossier `backend`, par exemple `C:\chemin\chez_nous\backend`.
+
+Autre possibilité, sans fenêtre ouverte : une tâche qui se répète toutes les 20 minutes, avec les arguments `manage.py synchro_airbnb` (sans `--boucle`).
+
+Sur un serveur Linux, la même boucle, ou une ligne cron :
+
+```cron
+*/20 * * * * cd /chemin/chez_nous/backend && .venv/bin/python manage.py synchro_airbnb
+```
+
+### E-mails de confirmation
+
+Les e-mails remplissent le nom du voyageur, le nombre de voyageurs, le code (par exemple `HMTEST01`) et le versement. Le versement est enregistré comme **montant prévu**, pas comme argent déjà encaissé : quand l’argent arrive vraiment, enregistrez l’encaissement comme d’habitude. Si un champ manque dans le message, il reste à compléter et le reste continue. Une annulation libère les dates et garde l’historique, y compris un encaissement déjà saisi.
+
+La boîte est lue seule : aucun e-mail n’est supprimé. Seuls les champs utiles sont gardés, pas le texte complet du message. Le format des e-mails Airbnb change parfois : si un vrai message n’est plus reconnu, le parseur (`backend/chez_nous/emails_airbnb.py`) sera à ajuster avec ce message.
+
+Dans `backend/.env` :
+
+```text
+AIRBNB_IMAP_HOTE=imap.gmail.com
+AIRBNB_IMAP_PORT=993
+AIRBNB_IMAP_UTILISATEUR=gloria@gmail.com
+AIRBNB_IMAP_MOT_DE_PASSE=le-mot-de-passe-application
+AIRBNB_IMAP_DOSSIER=INBOX
+AIRBNB_IMAP_EXPEDITEURS=automated@airbnb.com,express@airbnb.com
+```
+
+Pour Outlook, l’hôte est souvent `outlook.office365.com`, le port `993`, et l’utilisateur est l’adresse Outlook complète. Le mot de passe normal du compte ne convient pas.
+
+#### Mot de passe d’application Gmail
+
+1. Ouvrez [https://myaccount.google.com/security](https://myaccount.google.com/security).
+2. Activez la **validation en deux étapes** si ce n’est pas déjà fait.
+3. Cherchez **Mots de passe des applications** (parfois dans la recherche du compte Google).
+4. Créez un mot de passe nommé `Chez Nous`.
+5. Google affiche 16 lettres. Copiez-les dans `AIRBNB_IMAP_MOT_DE_PASSE`, sans espaces.
+6. `AIRBNB_IMAP_HOTE` vaut `imap.gmail.com`, l’utilisateur est l’adresse Gmail complète.
+
+#### Mot de passe d’application Outlook
+
+1. Ouvrez [https://account.microsoft.com/security](https://account.microsoft.com/security).
+2. Activez la **validation en deux étapes**.
+3. Ouvrez **Mot de passe d’application** et créez-en un pour `Chez Nous`.
+4. Collez-le dans `AIRBNB_IMAP_MOT_DE_PASSE`.
+5. Hôte : `outlook.office365.com`. Utilisateur : l’adresse Outlook complète.
+
+Relancez Django après avoir enregistré `.env`. Le tableau de bord affiche le résultat de la dernière lecture (« 1 créée, 1 complétée… »).
 
 ## Tests
 

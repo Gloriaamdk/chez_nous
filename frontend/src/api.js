@@ -108,6 +108,31 @@ export function updateLogement(id, logement) {
   })
 }
 
+export function synchroniserAirbnb(id) {
+  return requestJson(`/api/logements/${id}/synchroniser/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
+export function nouveauLienIcal(id) {
+  return requestJson(`/api/logements/${id}/nouveau-lien-ical/`, {
+    method: 'POST',
+    body: JSON.stringify({}),
+  })
+}
+
+export function getLectureEmails() {
+  return requestJson('/api/airbnb/lecture/')
+}
+
+export function lienAbsolu(chemin) {
+  if (!chemin) {
+    return ''
+  }
+  return new URL(chemin, window.location.origin).href
+}
+
 export function getReservations() {
   return requestJson('/api/reservations/')
 }

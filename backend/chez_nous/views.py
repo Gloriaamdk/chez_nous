@@ -1,13 +1,17 @@
+import secrets
 from datetime import datetime
 
 from django.db.models import Prefetch
+from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from .models import Depense, Logement, NuitOccupee, Paiement, Reservation
+from .airbnb import ErreurCalendrier, construire_ical, synchroniser_logement
+from .lecture_emails import etat_lecture, imap_configure
+from .models import Depense, Logement, NuitOccupee, Paiement, Reservation, generer_jeton_ical
 from .occupations import construire_tableau
 from .pays import PAYS_PAR_CODE, pays_francais
 from .rapports import construire_rapport
@@ -111,6 +115,18 @@ def tableau_de_bord(request):
 
 
 @api_view(["GET"])
+def lecture_emails(request):
+    le, resultat = etat_lecture()
+    return Response(
+        {
+            "configuree": imap_configure(),
+            "le": le,
+            "resultat": resultat,
+        }
+    )
+
+
+@api_view(["GET"])
 def rapport(request):
     periode = request.query_params.get("periode", "mois")
     if periode not in {"semaine", "mois"}:
@@ -128,6 +144,31 @@ def rapport(request):
     )
 
 
+def _calendrier_introuvable():
+    return HttpResponse(
+        "Calendrier introuvable.",
+        status=404,
+        content_type="text/plain; charset=utf-8",
+    )
+
+
+def calendrier_public(request, logement_id, jeton):
+    """Lien iCal collé dans Airbnb. Public, mais le jeton n’est pas devinable."""
+    if request.method != "GET":
+        return HttpResponse(status=405)
+    try:
+        logement = Logement.objects.get(pk=logement_id)
+    except Logement.DoesNotExist:
+        return _calendrier_introuvable()
+    attendu = logement.jeton_ical or ""
+    if len(attendu) != len(jeton) or not secrets.compare_digest(attendu, jeton):
+        return _calendrier_introuvable()
+    reponse = HttpResponse(construire_ical(logement), content_type="text/calendar; charset=utf-8")
+    reponse["Content-Disposition"] = 'inline; filename="calendrier.ics"'
+    reponse["Cache-Control"] = "private, no-store"
+    return reponse
+
+
 class LogementViewSet(ModelViewSet):
     serializer_class = LogementSerializer
     http_method_names = ["get", "post", "patch", "head", "options"]
@@ -137,6 +178,28 @@ class LogementViewSet(ModelViewSet):
         return Logement.objects.prefetch_related(
             Prefetch("reservations", queryset=actives, to_attr="reservations_actives")
         )
+
+    @action(detail=True, methods=["post"], url_path="synchroniser")
+    def synchroniser(self, request, pk=None):
+        logement = self.get_object()
+        if not (logement.url_ical_airbnb or "").strip():
+            return Response(
+                {"detail": "Indiquez d’abord l’adresse du calendrier Airbnb."},
+                status=400,
+            )
+        try:
+            synchroniser_logement(logement)
+        except ErreurCalendrier as exc:
+            return Response({"detail": str(exc)}, status=400)
+        logement.refresh_from_db()
+        return Response(self.get_serializer(logement).data)
+
+    @action(detail=True, methods=["post"], url_path="nouveau-lien-ical")
+    def nouveau_lien_ical(self, request, pk=None):
+        logement = self.get_object()
+        logement.jeton_ical = generer_jeton_ical()
+        logement.save(update_fields=["jeton_ical"])
+        return Response(self.get_serializer(logement).data)
 
 
 class ReservationViewSet(ModelViewSet):
