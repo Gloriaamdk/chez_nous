@@ -58,6 +58,8 @@ Django demande, en français :
 
 Ouvrez ensuite l'interface (voir ci-dessous) et connectez-vous avec ces identifiants. Le bouton « Se déconnecter » est en haut de l'écran. Si la session expire, l'écran de connexion revient.
 
+Les écrans sont : Accueil, Réservations, Logements, Argent, et Plus. Le calendrier (pour un appel) et les rapports sont dans Plus. Sur un ordinateur, ce menu est à gauche. Sur le téléphone, il est en bas.
+
 Pour un autre compte (une personne de confiance), connectez-vous à http://127.0.0.1:8000/admin/ avec le compte créé ci-dessus, puis ajoutez un utilisateur. Cochez « Statut équipe » seulement si cette personne doit aussi ouvrir l'administration. Tout compte actif peut utiliser l'application. Il n'y a pas de mot de passe par défaut : sans compte, personne ne voit les noms, les téléphones ni les montants.
 
 ## Lancement du frontend
@@ -71,6 +73,12 @@ npm run dev
 ```
 
 Vite sert l'interface, en général sur http://localhost:5173 . Ouvrez cette adresse dans le navigateur, y compris sur le téléphone : c'est elle qui envoie le cookie de connexion. Le proxy défini dans `frontend/vite.config.js` transmet les adresses qui commencent par `/api` vers Django sur http://127.0.0.1:8000 . Lancez le backend avant d'utiliser l'interface.
+
+Cette étape visuelle n'ajoute aucun paquet npm. Les polices sont déjà dans `frontend/src/fonts/`. Si `frontend/node_modules` existe, relancez seulement `npm run dev`. Sinon, faites `npm install` une fois, puis `npm run dev`.
+
+## Sur le téléphone
+
+Dans Safari (iPhone) ou Chrome (Android), ouvrez le site puis « Ajouter à l'écran d'accueil » (ou « Sur l'écran d'accueil »). Le nom affiché est « Chez Nous », avec le logo. Il n'y a rien à installer depuis un magasin d'applications, et pas de service en arrière-plan : l'icône ouvre simplement le site.
 
 Si Vite n'utilise pas le port 5173, ou si le téléphone ouvre une adresse du type `http://192.168.1.12:5173`, ajoutez cette origine dans `backend/.env` (sans espace après les virgules), puis relancez Django :
 

@@ -1,9 +1,11 @@
 import { useState } from 'react'
 import { connecter } from '../api.js'
+import { Alerte } from '../interface.jsx'
 
 export default function Connexion({ sessionExpiree, onConnectee }) {
   const [identifiant, setIdentifiant] = useState('')
   const [motDePasse, setMotDePasse] = useState('')
+  const [afficher, setAfficher] = useState(false)
   const [erreur, setErreur] = useState('')
   const [enCours, setEnCours] = useState(false)
 
@@ -22,15 +24,13 @@ export default function Connexion({ sessionExpiree, onConnectee }) {
   }
 
   return (
-    <main className="page">
-      <h1>Connexion</h1>
-      <p className="intro">
+    <main className="carte-connexion">
+      <h1 className="titre-connexion">Connexion</h1>
+      <p className="chapo">
         Réservé à la propriétaire et aux comptes créés dans l’administration.
       </p>
       {sessionExpiree ? (
-        <p className="erreur session-expiree" role="status">
-          Votre session a expiré. Reconnectez-vous.
-        </p>
+        <Alerte>Votre session a expiré. Reconnectez-vous.</Alerte>
       ) : null}
       <form className="formulaire" onSubmit={soumettre}>
         <label>
@@ -38,6 +38,9 @@ export default function Connexion({ sessionExpiree, onConnectee }) {
           <input
             name="identifiant"
             autoComplete="username"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
             value={identifiant}
             onChange={(evenement) => {
               setIdentifiant(evenement.target.value)
@@ -48,24 +51,29 @@ export default function Connexion({ sessionExpiree, onConnectee }) {
         </label>
         <label>
           Mot de passe
-          <input
-            name="mot_de_passe"
-            type="password"
-            autoComplete="current-password"
-            value={motDePasse}
-            onChange={(evenement) => {
-              setMotDePasse(evenement.target.value)
-              setErreur('')
-            }}
-            required
-          />
+          <span className="champ-mot">
+            <input
+              name="mot_de_passe"
+              type={afficher ? 'text' : 'password'}
+              autoComplete="current-password"
+              value={motDePasse}
+              onChange={(evenement) => {
+                setMotDePasse(evenement.target.value)
+                setErreur('')
+              }}
+              required
+            />
+            <button
+              className="bouton bouton-secondaire"
+              type="button"
+              onClick={() => setAfficher((valeur) => !valeur)}
+            >
+              {afficher ? 'Masquer' : 'Afficher'}
+            </button>
+          </span>
         </label>
-        {erreur ? (
-          <p className="erreur" role="alert">
-            {erreur}
-          </p>
-        ) : null}
-        <button className="bouton" type="submit" disabled={enCours}>
+        {erreur ? <Alerte>{erreur}</Alerte> : null}
+        <button className="bouton bouton-large" type="submit" disabled={enCours}>
           {enCours ? 'Connexion…' : 'Se connecter'}
         </button>
       </form>
