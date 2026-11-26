@@ -8,6 +8,8 @@ import {
   getReservations,
   updateReservation,
 } from '../api.js'
+import { formatDate, formatPlage, messageErreur } from '../format.js'
+import { Alerte, BadgeCanal, Chargement, Vide } from '../interface.jsx'
 
 const formulaireVide = {
   logement: '',
@@ -24,28 +26,29 @@ const formulaireVide = {
   nombre_voyageurs: '',
 }
 
-function messageErreur(error) {
-  const details = error.details
-  if (!details || typeof details !== 'object') {
-    return 'Enregistrement impossible.'
+function formulaireDepuisCalendrier(brouillon) {
+  return {
+    ...formulaireVide,
+    logement: brouillon.logementId,
+    date_arrivee: brouillon.arrivee,
+    date_depart: brouillon.depart,
   }
-  if (typeof details.detail === 'string') {
-    return details.detail
-  }
-  const textes = Object.values(details).flat().filter((valeur) => typeof valeur === 'string')
-  return textes[0] || 'Enregistrement impossible.'
 }
 
-export default function Reservations({ brouillon }) {
+export default function Reservations({ brouillon, intention }) {
+  const depuisCalendrier = Boolean(brouillon)
   const [logements, setLogements] = useState([])
   const [canaux, setCanaux] = useState([])
   const [modes, setModes] = useState([])
   const [reservations, setReservations] = useState([])
-  const [formulaire, setFormulaire] = useState(formulaireVide)
-  const [ouvert, setOuvert] = useState(false)
+  const [formulaire, setFormulaire] = useState(() => (
+    depuisCalendrier ? formulaireDepuisCalendrier(brouillon) : formulaireVide
+  ))
+  const [ouvert, setOuvert] = useState(depuisCalendrier || intention?.action === 'creer')
   const [edition, setEdition] = useState(null)
   const [confirmation, setConfirmation] = useState(null)
   const [erreur, setErreur] = useState('')
+  const [chargement, setChargement] = useState(true)
   const [enregistrement, setEnregistrement] = useState(false)
 
   async function charger() {
@@ -53,31 +56,31 @@ export default function Reservations({ brouillon }) {
   }
 
   useEffect(() => {
-    getLogements().then(setLogements).catch(() => setErreur('Les logements sont indisponibles.'))
-    getReferentiels()
-      .then((data) => {
-        setCanaux(data.canaux)
-        setModes(data.modes)
+    let ignore = false
+    Promise.all([getLogements(), getReferentiels(), getReservations()])
+      .then(([biens, refs, sejours]) => {
+        if (ignore) {
+          return
+        }
+        setLogements(biens)
+        setCanaux(refs.canaux)
+        setModes(refs.modes)
+        setReservations(sejours)
       })
-      .catch(() => setErreur('Les listes de saisie sont indisponibles.'))
-    charger().catch(() => setErreur('Les réservations sont indisponibles.'))
-  }, [])
-
-  useEffect(() => {
-    if (!brouillon) {
-      return
+      .catch(() => {
+        if (!ignore) {
+          setErreur('Les réservations sont indisponibles.')
+        }
+      })
+      .finally(() => {
+        if (!ignore) {
+          setChargement(false)
+        }
+      })
+    return () => {
+      ignore = true
     }
-    setEdition(null)
-    setConfirmation(null)
-    setFormulaire((actuel) => ({
-      ...formulaireVide,
-      ...actuel,
-      logement: brouillon.logementId,
-      date_arrivee: brouillon.arrivee,
-      date_depart: brouillon.depart,
-    }))
-    setOuvert(true)
-  }, [brouillon])
+  }, [])
 
   function modifierChamp(evenement) {
     const { name, value } = evenement.target
@@ -90,6 +93,7 @@ export default function Reservations({ brouillon }) {
     setFormulaire(formulaireVide)
     setErreur('')
     setOuvert(true)
+    window.scrollTo(0, 0)
   }
 
   function ouvrirModification(reservation) {
@@ -114,12 +118,14 @@ export default function Reservations({ brouillon }) {
       nombre_voyageurs: reservation.nombre_voyageurs ? String(reservation.nombre_voyageurs) : '',
     })
     setOuvert(true)
+    window.scrollTo(0, 0)
   }
 
   function fermerFormulaire() {
     setOuvert(false)
     setEdition(null)
     setFormulaire(formulaireVide)
+    window.scrollTo(0, 0)
   }
 
   async function enregistrer(evenement) {
@@ -177,19 +183,37 @@ export default function Reservations({ brouillon }) {
     }
   }
 
+  const formulaireOuvert = ouvert || confirmation
+
   return (
     <section className="page">
-      <div className="barre-logements">
-        <h1>Réservations</h1>
-        {ouvert || confirmation ? null : (
+      {!formulaireOuvert ? (
+        <div className="page-entete">
+          <div>
+            <h1>Réservations</h1>
+            <p className="chapo">Nuitée ou mois, acompte, et annulation sans perdre l’historique.</p>
+          </div>
           <button type="button" className="bouton" onClick={ouvrirCreation}>
             Nouvelle réservation
           </button>
-        )}
-      </div>
+        </div>
+      ) : (
+        <button
+          className="retour"
+          type="button"
+          onClick={() => {
+            setConfirmation(null)
+            fermerFormulaire()
+          }}
+        >
+          ← Réservations
+        </button>
+      )}
+
       {brouillon && ouvert && !edition ? (
-        <p className="intro">Les dates et le logement choisis dans le calendrier sont conservés.</p>
+        <p className="note">Les dates et le logement choisis dans le calendrier sont conservés.</p>
       ) : null}
+
       {confirmation ? (
         <form className="formulaire" onSubmit={confirmerAnnulation}>
           <h2>Annuler la réservation</h2>
@@ -203,10 +227,10 @@ export default function Reservations({ brouillon }) {
               À rembourser si besoin.
             </p>
           ) : null}
-          {erreur ? <p className="erreur">{erreur}</p> : null}
+          {erreur ? <Alerte>{erreur}</Alerte> : null}
           <div className="actions">
             <button type="submit" className="bouton bouton-danger" disabled={enregistrement}>
-              Confirmer l’annulation
+              {enregistrement ? 'Annulation…' : 'Confirmer l’annulation'}
             </button>
             <button
               type="button"
@@ -218,6 +242,7 @@ export default function Reservations({ brouillon }) {
           </div>
         </form>
       ) : null}
+
       {ouvert ? (
         <form className="formulaire" onSubmit={enregistrer}>
           <h2>{edition ? 'Modifier la réservation' : 'Nouvelle réservation'}</h2>
@@ -240,11 +265,25 @@ export default function Reservations({ brouillon }) {
           </label>
           <label>
             Client
-            <input name="client_nom" value={formulaire.client_nom} onChange={modifierChamp} required />
+            <input
+              name="client_nom"
+              value={formulaire.client_nom}
+              onChange={modifierChamp}
+              autoComplete="name"
+              required
+            />
           </label>
           <label>
             Téléphone
-            <input name="client_telephone" value={formulaire.client_telephone} onChange={modifierChamp} inputMode="tel" required />
+            <input
+              name="client_telephone"
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={formulaire.client_telephone}
+              onChange={modifierChamp}
+              required
+            />
           </label>
           <label>
             Canal
@@ -263,18 +302,27 @@ export default function Reservations({ brouillon }) {
             </select>
           </label>
           {formulaire.blocage ? (
-            <p className="intro">
+            <p className="aide">
               Blocage Airbnb : ces dates restent occupées, sans montant à recevoir.
               La prochaine synchronisation peut les réécrire.
             </p>
           ) : (
             <label>
               {formulaire.mode === 'mois' ? 'Loyer mensuel (FCFA)' : 'Montant du séjour (FCFA)'}
-              <input name="montant_prevu" type="number" min="1" step="1" value={formulaire.montant_prevu} onChange={modifierChamp} required />
+              <input
+                name="montant_prevu"
+                type="number"
+                inputMode="numeric"
+                min="1"
+                step="1"
+                value={formulaire.montant_prevu}
+                onChange={modifierChamp}
+                required
+              />
             </label>
           )}
           {formulaire.canal === 'airbnb' && !formulaire.blocage ? (
-            <p className="intro">
+            <p className="aide">
               Séjour Airbnb. Le calendrier ne donne ni le nom ni le prix : les e-mails les complètent,
               sinon saisissez-les ici.
             </p>
@@ -283,16 +331,32 @@ export default function Reservations({ brouillon }) {
             <>
               <label>
                 Code de confirmation
-                <input name="code_airbnb" value={formulaire.code_airbnb} onChange={modifierChamp} autoComplete="off" />
+                <input
+                  name="code_airbnb"
+                  value={formulaire.code_airbnb}
+                  onChange={modifierChamp}
+                  autoComplete="off"
+                  autoCapitalize="characters"
+                  autoCorrect="off"
+                  spellCheck={false}
+                />
               </label>
               <label>
                 Voyageurs
-                <input name="nombre_voyageurs" type="number" min="1" step="1" value={formulaire.nombre_voyageurs} onChange={modifierChamp} />
+                <input
+                  name="nombre_voyageurs"
+                  type="number"
+                  inputMode="numeric"
+                  min="1"
+                  step="1"
+                  value={formulaire.nombre_voyageurs}
+                  onChange={modifierChamp}
+                />
               </label>
             </>
           ) : null}
           {edition ? (
-            <p className="intro">
+            <p className="aide">
               {edition.montantEncaisse > 0
                 ? `${formatFcfa(edition.montantEncaisse)} déjà encaissés restent attachés à ce séjour.`
                 : 'Les encaissements déjà enregistrés restent attachés à ce séjour.'}
@@ -300,51 +364,93 @@ export default function Reservations({ brouillon }) {
           ) : (
             <label>
               Acompte encaissé (FCFA)
-              <input name="acompte" type="number" min="0" step="1" value={formulaire.acompte} onChange={modifierChamp} />
+              <input
+                name="acompte"
+                type="number"
+                inputMode="numeric"
+                min="0"
+                step="1"
+                value={formulaire.acompte}
+                onChange={modifierChamp}
+              />
             </label>
           )}
-          {erreur ? <p className="erreur">{erreur}</p> : null}
+          {erreur ? <Alerte>{erreur}</Alerte> : null}
           <div className="actions">
-            <button type="submit" className="bouton" disabled={enregistrement}>Enregistrer</button>
-            <button type="button" className="bouton bouton-secondaire" onClick={fermerFormulaire}>Fermer</button>
+            <button type="submit" className="bouton" disabled={enregistrement}>
+              {enregistrement ? 'Enregistrement…' : 'Enregistrer'}
+            </button>
+            <button type="button" className="bouton bouton-secondaire" onClick={fermerFormulaire}>
+              Fermer
+            </button>
           </div>
         </form>
       ) : null}
-      {!ouvert && erreur ? <p className="erreur">{erreur}</p> : null}
-      {reservations.length === 0 ? (
-        <p className="vide">Aucune réservation pour le moment.</p>
-      ) : (
+
+      {!formulaireOuvert && chargement ? <Chargement texte="Chargement des réservations…" /> : null}
+      {!formulaireOuvert && erreur ? <Alerte>{erreur}</Alerte> : null}
+      {!formulaireOuvert && !chargement && reservations.length === 0 ? (
+        <Vide
+          titre="Aucune réservation pour le moment"
+          texte="Pendant un appel, notez le séjour et l’acompte ici."
+          action={(
+            <button type="button" className="bouton" onClick={ouvrirCreation}>
+              Nouvelle réservation
+            </button>
+          )}
+        />
+      ) : null}
+      {!formulaireOuvert && reservations.length > 0 ? (
         <ul className="cartes">
           {reservations.map((reservation) => (
             <li key={reservation.id} className={reservation.annulee ? 'carte carte-annulee' : 'carte'}>
-              <h3>{reservation.client_nom}</h3>
-              <p>{reservation.logement_nom}</p>
-              <p>{reservation.date_arrivee} → {reservation.date_depart}</p>
-              <p>{reservation.mode_libelle} · {reservation.canal_libelle}</p>
-              {reservation.blocage ? <p className="badge-blocage">Blocage Airbnb</p> : null}
+              <div className="carte-entete">
+                <h3>{reservation.client_nom}</h3>
+                <BadgeCanal canal={reservation.canal} libelle={reservation.canal_libelle} />
+              </div>
+              <p className="lieu">{reservation.logement_nom}</p>
+              <p className="dates">{formatPlage(reservation.date_arrivee, reservation.date_depart)}</p>
+              <p className="meta">{reservation.mode_libelle}</p>
+              {reservation.blocage ? <p><span className="badge badge-blocage">Blocage Airbnb</span></p> : null}
               {!reservation.annulee && !reservation.blocage && reservation.canal === 'airbnb' && reservation.montant_prevu === 0 ? (
-                <p className="badge-airbnb">À compléter</p>
+                <p><span className="badge badge-a-completer">À compléter</span></p>
               ) : null}
               {reservation.code_airbnb ? <p>Code Airbnb : {reservation.code_airbnb}</p> : null}
               {reservation.nombre_voyageurs ? (
                 <p>{reservation.nombre_voyageurs} voyageur{reservation.nombre_voyageurs > 1 ? 's' : ''}</p>
               ) : null}
               {reservation.blocage ? (
-                <p>Ces dates sont occupées. Ce blocage ne compte pas dans les sommes à recevoir.</p>
+                <p className="aide">Ces dates sont occupées. Ce blocage ne compte pas dans les sommes à recevoir.</p>
               ) : null}
               {reservation.annulee ? (
                 <>
-                  <p className="badge-annulee">Annulée{reservation.annulee_le ? ` le ${reservation.annulee_le}` : ''}</p>
+                  <p>
+                    <span className="badge badge-annulee">
+                      Annulée{reservation.annulee_le ? ` le ${formatDate(reservation.annulee_le)}` : ''}
+                    </span>
+                  </p>
                   {reservation.montant_encaisse > 0 ? (
-                    <p>Encaissé conservé : {formatFcfa(reservation.montant_encaisse)}</p>
+                    <p className="ligne-montant">
+                      <span>Encaissé conservé</span>
+                      <strong>{formatFcfa(reservation.montant_encaisse)}</strong>
+                    </p>
                   ) : null}
-                  <p>Ce séjour ne compte plus dans le prévu. Les dates sont libres.</p>
+                  <p className="aide">Ce séjour ne compte plus dans le prévu. Les dates sont libres.</p>
                 </>
               ) : (
                 <>
-                  <p>Prévu : {formatFcfa(reservation.montant_total_prevu)}</p>
-                  <p>Encaissé : {formatFcfa(reservation.montant_encaisse)}</p>
-                  <p>Reste : {formatFcfa(reservation.reste_a_recevoir)}</p>
+                  <p className="ligne-montant">
+                    <span>Prévu</span>
+                    <strong>{formatFcfa(reservation.montant_total_prevu)}</strong>
+                  </p>
+                  <p className="ligne-montant">
+                    <span>Encaissé</span>
+                    <strong>{formatFcfa(reservation.montant_encaisse)}</strong>
+                  </p>
+                  <p className="ligne-montant">
+                    <span>Reste</span>
+                    <strong>{formatFcfa(reservation.reste_a_recevoir)}</strong>
+                  </p>
                   <div className="actions-carte">
                     <button type="button" className="bouton bouton-secondaire" onClick={() => ouvrirModification(reservation)}>
                       Modifier
@@ -357,6 +463,7 @@ export default function Reservations({ brouillon }) {
                         setEdition(null)
                         setErreur('')
                         setConfirmation(reservation)
+                        window.scrollTo(0, 0)
                       }}
                     >
                       Annuler la réservation
@@ -367,7 +474,7 @@ export default function Reservations({ brouillon }) {
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
     </section>
   )
 }

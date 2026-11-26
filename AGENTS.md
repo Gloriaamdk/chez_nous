@@ -120,4 +120,13 @@ Mettre à jour la section Avancement après chaque vérification.
  - Sur Windows, dans `backend`, environnement virtuel activé : `python -m pip install -r requirements.txt`, puis `python manage.py migrate`, puis `python manage.py test`.
  - `manage.py check` : aucun problème. `manage.py test` : 53 tests, OK. `npm run build` : compilation réussie.
  - Parcours navigateur : fiche du logement (lien Airbnb, lien à copier, résultat, bouton), réservation à compléter, blocage, dernière lecture des e-mails.
+- Terminé : refonte de l’interface, vérifiée sur téléphone et sur ordinateur.
+  - Identité du logo : vert sapin `#1F3D33`, caramel `#C08A55`, crème `#F8F0E4`. Le logo est un SVG (maison, « Chez », « nous », filet, « FEEL AT HOME ») et un PNG, dans `frontend/public/`.
+  - Titres en Playfair Display, texte en Inter. Les deux polices sont dans `frontend/src/fonts/`, sans paquet supplémentaire.
+  - Écran de connexion avec le logo en grand et « Feel at home ».
+  - Accueil : « Bonjour », résumé du jour, prochaines arrivées et départs, actions rapides.
+  - Navigation : Accueil, Réservations, Logements, Argent, Plus. Le calendrier et les rapports sont dans Plus. Le logo est dans l’en-tête. « Se déconnecter » reste en haut.
+  - Application installable : `frontend/public/manifest.webmanifest`, icônes 192 et 512, apple-touch-icon, favicon, `theme-color`. Pas de service worker.
+  - Aucun changement de backend. `manage.py test` : 53 tests, OK. `npm run build` : compilation réussie.
+  - Parcours navigateur : mot de passe refusé, connexion, accueil, réservation préremplie depuis le calendrier, fiche logement, déconnexion. Sur grand écran, le menu est à gauche.
 - Prochaine étape : publier l’application sur une adresse internet, pour qu’Airbnb puisse lire le lien d’export. Tant que le site n’est que sur le PC, l’import (Airbnb vers l’appli) fonctionne ; l’export (l’appli vers Airbnb) attend que ce lien soit joignable.

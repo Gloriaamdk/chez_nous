@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { getDisponibilites, getLogements } from '../api.js'
+import { Alerte, Chargement, Vide } from '../interface.jsx'
 
-export default function Calendrier({ onChoisirLogement }) {
+export default function Calendrier({ onChoisirLogement, onRetour }) {
   const [arrivee, setArrivee] = useState('')
   const [depart, setDepart] = useState('')
   const [resultat, setResultat] = useState(null)
@@ -36,10 +37,18 @@ export default function Calendrier({ onChoisirLogement }) {
 
   return (
     <section className="page">
+      {onRetour ? (
+        <button className="retour" type="button" onClick={onRetour}>
+          ← Plus
+        </button>
+      ) : null}
       <h1>Calendrier</h1>
-      <p className="intro">Choisissez deux dates pour voir quel logement est libre.</p>
+      <p className="chapo">Choisissez deux dates pour voir quel logement est libre.</p>
       {aucunLogement ? (
-        <p className="vide">Ajoutez d’abord un logement depuis le tableau de bord.</p>
+        <Vide
+          titre="Ajoutez d’abord un logement"
+          texte="Le calendrier a besoin d’au moins un logement, depuis l’onglet Logements."
+        />
       ) : null}
       <form className="formulaire" onSubmit={verifier}>
         <label>
@@ -50,18 +59,19 @@ export default function Calendrier({ onChoisirLogement }) {
           Départ
           <input type="date" value={depart} onChange={(evenement) => setDepart(evenement.target.value)} required />
         </label>
-        {erreur ? <p className="erreur">{erreur}</p> : null}
+        {erreur ? <Alerte>{erreur}</Alerte> : null}
         <button type="submit" className="bouton" disabled={chargement}>
-          Voir les logements libres
+          {chargement ? 'Vérification…' : 'Voir les logements libres'}
         </button>
       </form>
+      {chargement ? <Chargement texte="Recherche des logements libres…" /> : null}
       {resultat ? (
         <ul className="cartes">
           {resultat.logements.map((logement) => (
             <li key={logement.id} className="carte">
               <h3>{logement.nom}</h3>
-              <p>{logement.type_libelle}</p>
-              <p className={logement.libre ? 'libre' : 'occupe'}>
+              <p className="lieu">{logement.type_libelle}</p>
+              <p className={logement.libre ? 'statut statut-libre' : 'statut statut-occupe'}>
                 {logement.libre ? 'Libre' : 'Déjà réservé'}
               </p>
               {logement.libre ? (

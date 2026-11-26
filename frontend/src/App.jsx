@@ -5,24 +5,36 @@ import {
   getMoi,
   preparerCsrf,
 } from './api.js'
-import Calendrier from './pages/Calendrier.jsx'
+import {
+  Alerte,
+  Chargement,
+  IconeAccueil,
+  IconeArgent,
+  IconeLogements,
+  IconePlus,
+  IconeReservations,
+  LogoComplet,
+  Marque,
+} from './interface.jsx'
 import Connexion from './pages/Connexion.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Finances from './pages/Finances.jsx'
-import Rapports from './pages/Rapports.jsx'
+import Logements from './pages/Logements.jsx'
+import Plus from './pages/Plus.jsx'
 import Reservations from './pages/Reservations.jsx'
 
-const pages = [
-  { id: 'dashboard', label: 'Accueil', Component: Dashboard },
-  { id: 'calendrier', label: 'Calendrier', Component: Calendrier },
-  { id: 'reservations', label: 'Réservations', Component: Reservations },
-  { id: 'finances', label: 'Finances', Component: Finances },
-  { id: 'rapports', label: 'Rapports', Component: Rapports },
+const onglets = [
+  { id: 'accueil', label: 'Accueil', Icone: IconeAccueil },
+  { id: 'reservations', label: 'Réservations', Icone: IconeReservations },
+  { id: 'logements', label: 'Logements', Icone: IconeLogements },
+  { id: 'argent', label: 'Argent', Icone: IconeArgent },
+  { id: 'plus', label: 'Plus', Icone: IconePlus },
 ]
 
 export default function App() {
-  const [pageId, setPageId] = useState('dashboard')
+  const [pageId, setPageId] = useState('accueil')
   const [brouillon, setBrouillon] = useState(null)
+  const [intention, setIntention] = useState(null)
   const [profil, setProfil] = useState(null)
   const [chargement, setChargement] = useState(true)
   const [sessionExpiree, setSessionExpiree] = useState(false)
@@ -80,6 +92,10 @@ export default function App() {
     }
   }, [essai])
 
+  useEffect(() => {
+    window.scrollTo(0, 0)
+  }, [pageId])
+
   function connectee(data) {
     profilRef.current = data
     setSessionExpiree(false)
@@ -96,32 +112,42 @@ export default function App() {
     profilRef.current = null
     setSessionExpiree(false)
     setProfil(null)
-    setPageId('dashboard')
+    setPageId('accueil')
     setBrouillon(null)
+    setIntention(null)
+  }
+
+  function aller(page, prochaine = null) {
+    if (prochaine?.action === 'creer') {
+      setBrouillon(null)
+    }
+    setIntention(prochaine)
+    setPageId(page)
+  }
+
+  function choisirLogement(choix) {
+    setIntention(null)
+    setBrouillon(choix)
+    setPageId('reservations')
   }
 
   if (chargement) {
     return (
-      <div className="app app-connexion">
-        <p className="brand">Chez Nous</p>
-        <main className="page">
-          <p className="intro">Chargement…</p>
-        </main>
+      <div className="ecran-connexion">
+        <LogoComplet />
+        <Chargement texte="Chargement…" />
       </div>
     )
   }
 
   if (erreurServeur) {
     return (
-      <div className="app app-connexion">
-        <p className="brand">Chez Nous</p>
-        <main className="page">
-          <h1>Connexion</h1>
-          <p className="erreur" role="alert">
-            {erreurServeur}
-          </p>
+      <div className="ecran-connexion">
+        <LogoComplet />
+        <div className="carte-connexion">
+          <Alerte>{erreurServeur}</Alerte>
           <button
-            className="bouton"
+            className="bouton bouton-large"
             type="button"
             onClick={() => {
               setChargement(true)
@@ -130,49 +156,74 @@ export default function App() {
           >
             Réessayer
           </button>
-        </main>
+        </div>
       </div>
     )
   }
 
   if (!profil) {
     return (
-      <div className="app app-connexion">
-        <p className="brand">Chez Nous</p>
+      <div className="ecran-connexion">
+        <LogoComplet />
         <Connexion sessionExpiree={sessionExpiree} onConnectee={connectee} />
       </div>
     )
   }
 
-  const current = pages.find((page) => page.id === pageId) ?? pages[0]
-  const Page = current.Component
-
-  function choisirLogement(choix) {
-    setBrouillon(choix)
-    setPageId('reservations')
+  let page = null
+  if (pageId === 'accueil') {
+    page = <Dashboard profil={profil} onAller={aller} />
+  } else if (pageId === 'reservations') {
+    page = (
+      <Reservations
+        brouillon={brouillon}
+        intention={intention}
+      />
+    )
+  } else if (pageId === 'logements') {
+    page = <Logements />
+  } else if (pageId === 'argent') {
+    page = (
+      <Finances
+        intention={intention}
+      />
+    )
+  } else {
+    page = <Plus onChoisirLogement={choisirLogement} />
   }
 
   return (
     <div className="app">
-      <header className="entete">
-        <p className="brand">Chez Nous</p>
-        <button className="bouton bouton-secondaire" type="button" onClick={quitter}>
-          Se déconnecter
-        </button>
-      </header>
-      <Page brouillon={brouillon} onChoisirLogement={choisirLogement} />
-      <nav aria-label="Écrans">
-        {pages.map((page) => (
-          <button
-            key={page.id}
-            type="button"
-            aria-current={page.id === current.id ? 'page' : undefined}
-            onClick={() => setPageId(page.id)}
-          >
-            {page.label}
-          </button>
-        ))}
+      <a className="passer" href="#contenu">Aller au contenu</a>
+      <nav className="barre" aria-label="Écrans">
+        {onglets.map((onglet) => {
+          const Icone = onglet.Icone
+          const actif = pageId === onglet.id
+          return (
+            <button
+              key={onglet.id}
+              type="button"
+              aria-current={actif ? 'page' : undefined}
+              onClick={() => {
+                setIntention(null)
+                setPageId(onglet.id)
+              }}
+            >
+              <Icone />
+              <span>{onglet.label}</span>
+            </button>
+          )
+        })}
       </nav>
+      <div className="colonne" id="contenu">
+        <header className="entete">
+          <Marque />
+          <button className="bouton-quitter" type="button" onClick={quitter}>
+            Se déconnecter
+          </button>
+        </header>
+        {page}
+      </div>
     </div>
   )
 }
